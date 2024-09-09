@@ -1,0 +1,293 @@
+---
+title: "Maize pollen paper"
+author: "Johan Zicola"
+date: "`r format(Sys.time())`"
+output:
+  github_document:
+    toc: true
+  html_document:
+    toc: true
+    df_print: paged
+  pdf_document:
+    toc: true
+  html_notebook:
+    toc: true
+documentclass: article
+classoption: a4paper
+geometry: margin=1in
+---
+
+# Software dependencies
+
+* sra-toolkit (v3.0.5)
+* bedtools (v2.29.1)
+* bismark (v0.24.2)
+* Cleaveland (v4.5)
+* cutadapt (v4.4)
+* fastx (v0.0.14)
+* bowtie (1.2.1.1)
+* UNITAS (v1.8.0)
+* samtools (v1.9)
+* trim_galore (v.0.6.10) 
+* R (v4.3.2)
+* seqkit (v2.5.1)
+
+R packages:
+
+* DESeq2 (v1.28.1)
+
+# Data availability
+
+All data can be download on NCBI (PRJNA1077103)
+
+| accession   | library_ID       | Type      |
+|-------------|------------------|-----------|
+| SRR28009046 | 70SC_BS          | PBAT      |
+| SRR28009045 | 84SC_BS          | PBAT      |
+| SRR28009041 | 87SC_BS          | PBAT      |
+| SRR28009040 | F5_rep1_sRNA     | sRNA-seq  |
+| SRR28009039 | F5_rep2_sRNA     | sRNA-seq  |
+| SRR28009038 | F5_rep3_sRNA     | sRNA-seq  |
+| SRR28009037 | pollen_rep1_sRNA | sRNA-seq  |
+| SRR28009044 | pollen_rep2_sRNA | sRNA-seq  |
+| SRR28009036 | SC_rep1_sRNA     | sRNA-seq  |
+| SRR28009035 | SC_rep2_sRNA     | sRNA-seq  |
+| SRR28009043 | SC_rep3_sRNA     | sRNA-seq  |
+| SRR28009042 | pollen_degradome | Degradome |
+
+Download the raw fastq files using [sra-tools](https://github.com/ncbi/sra-tools/wiki) (see tutorial in https://github.com/johanzi/ncbi_tutorial).
+
+*PBAT: Post-bisulfite adapter tagging bisulfite-sequencing.*
+
+Download SRR_Acc_List.txt using the SRA Run selector and download the fastq files.
+
+```{bash, eval=FALSE}
+
+module load sratoolkit
+
+while read name; do
+        fastq-dump --split-files $name
+done < SRR_Acc_List.txt
+
+```
+
+
+
+# sRNA analysis
+
+## Trimming
+
+Sperm cell and pollen data (SRR28009037, SRR28009044, SRR28009036, SRR28009035, SRR28009043). These libraries were made with NEBNext small RNA kit (NEB, cat. no. E7300).
+
+```{bash, eval=FALSE}
+cutadapt -a agatcggaagagcacacgtct --discard-untrimmed <fastq.fq.gz> | \
+  cutadapt -m 18 -M 37 -o <fastq.trimmed.fq.gz> -
+```
+
+Vesicles fraction 5 (F5) data (SRR28009040, SRR28009039, SRR28009038). sRNA-seq libraries for these samples were made with the Small-seq protocol (Hagemann-Jensen et al. 2018). The trimming is different here because unique molecular identifiers (UMI) are present.
+
+```{bash, eval=FALSE}
+# Remove 3' adapter
+cutadapt -a tggaattctcgggtgccaagg --discard-untrimmed <fastq.fq.gz> | \
+  cutadapt -m 18 -o <fastq.trimmed.fq.gz> -
+
+# Collapse reads with the same UMI
+zcat <fastq.trimmed.fq.gz> | fastx_collapser -o <collapsed.fa>
+
+# Remove UMI sequence
+cutadapt -g ^NNNNNNNNCA --discard-untrimmed <collapsed.fa> | \
+  cutadapt -m 18 -M 37 -o <collapsed.trimmed_UMI.fa> -
+
+```
+
+
+## sRNA mapping
+
+We consider only sRNAs mapping without mismatch to the B73 NAM5 assembly (chromosomes, scaffolds, and organelles). Fasta file was obtained on https://download.maizegdb.org/Zm-B73-REFERENCE-NAM-5.0/Zm-B73-REFERENCE-NAM-5.0.fa.gz
+
+```{bash, eval=FALSE}
+
+# Collapse the sequences
+fastx_collapser -i <input_reads> -o <collapsed.fa>
+
+# Get B73 NAM5 genome
+wget https://download.maizegdb.org/Zm-B73-REFERENCE-NAM-5.0/Zm-B73-REFERENCE-NAM-5.0.fa.gz
+
+# Index genome
+bowtie-build -f Zm-B73-REFERENCE-NAM-5.0.fa index_Zm_B73_NAM5 
+
+# Map the reads without any mismatch allowed
+bowtie -S -l 37 -n 0 -x index_Zm_B73_NAM5 --threads 8 -f <collapsed.fa> | \
+  samtools sort | samtools view -b -o <mapped_reads.bam> -
+
+```
+
+
+## Select sRNAs present in at least two replicates
+
+We selected unique sRNAs found in at least 2/3 replicates for each tissue type (2/2 for pollen B73) and perform the intersect between sperm cell and fraction 5. `fastx_collapser` collapses sequences and add the number of time a given sequence is found. Therefore, sequences with a name containing 1, 2, or 3 are found in one, two, or three replicates, respectively.
+
+```{bash, eval=FALSE}
+
+# Convert mapped reads from bam to fasta
+samtools fasta -F 4 <mapped_reads.bam> > <mapped_reads.fa>
+
+# Concatenate reads of all replicates
+cat mapped_reads_rep1.fa mapped_reads_rep2.fa mapped_reads_rep3.fa > pooled_rep.fa
+
+# Rename to remove previous fastx_collapser naming
+seqkit replace -p .+ -r "seq_{nr}" pooled_rep.fa > pooled_rep.renamed.fa
+
+# Collapse reads
+fastx_collapser -i pooled_rep.renamed.fa -o pooled_rep.renamed.collapsed.fa
+
+# Keep reads with at least 2 replicates (remove read with 1 in the seq name)
+seqkit grep -v -r -p -1 pooled_rep.renamed.collapsed.fa \ 
+  > pooled_rep.renamed.collapsed.intersect_min_2.fa
+
+```
+
+```{bash, eval=FALSE}
+# Retrieve mapped reads and convert to fasta
+for i in mapped_fasta/*bam; do
+  prefix=$(basename ${i%%.*})
+  samtools fasta -F 4 $i > mapped_fasta/${prefix}.mapped.fa
+done
+
+# Pool reads across replicates
+## Vesicle samples
+while read i; do
+  cat ${i}_*.fa > pooled_replicates/${i}.mapped.fa
+done < <(\ls *.mapped.fa | cut -d_ -f1 | uniq)
+
+## SC and pollen samples
+while read i; do
+  cat ${i}_*.fa > pooled_replicates/${i}.mapped.fa
+done < <(\ls *.mapped.fa | cut -d_ -f1-2 | uniq)
+
+
+# Rename to remove previous fastx_collapser naming
+for i in pooled_replicates/*fa; do
+  prefix=$(basename ${i%%.*})
+  seqkit replace -p .+ -r "seq_{nr}" $i > pooled_replicates/${prefix}.mapped.renamed.fa
+  rm $i
+done
+
+# Collapse again
+for i in pooled_replicates/*renamed.fa; do
+  prefix=$(basename ${i%%.*})
+  fastx_collapser -i $i -o pooled_replicates/${prefix}.collapsed.fa
+done
+
+# Retrieve reads present in at least two replicates
+for i in pooled_replicates/*.collapsed.fa; do
+  prefix=$(basename ${i%%.*})
+  seqkit grep -v -r -p -1 $i > pooled_replicates/${prefix}.intersect_min_2.fa
+done
+
+```
+
+
+## Intersect sRNAs between F5 and SC
+
+```{bash, eval=FALSE}
+# Pool unique sequences from 2 tissues
+cat Fr5.intersect_min_2.fa SC_B73.intersect_min_2.fa > pooled_SC_Fr5.fa
+
+# Rename headers
+seqkit replace -p .+ -r "seq_{nr}" pooled_SC_Fr5.fa > pooled_SC_Fr5.renamed.fa
+rm pooled_SC_Fr5.fa
+
+# Collapse reads
+fastx_collapser -i pooled_SC_Fr5.renamed.fa -o pooled_SC_Fr5.renamed.collapsed.fa
+
+# Retrieve sequences that are in both tissue
+seqkit grep -v -r -p -1 pooled_SC_Fr5.renamed.collapsed.fa > pooled_SC_Fr5.intersect.fa
+
+seqkit stats pooled_SC_Fr5.intersect_min_2.fa
+file                              format  type  num_seqs  sum_len  min_len  avg_len  max_len
+pooled_SC_Fr5.intersect_min_2.fa  FASTA   DNA     22,408  609,987       18     27.2       37
+
+```
+
+22,408 common sequences found between SC and Pollen.
+
+
+## UNITAS analysis
+
+Install UNITAS v1.8.0
+
+```{bash, eval=FALSE}
+# Installation
+wget --no-check-certificate https://www.smallrnagroup.uni-mainz.de/software/unitas_1.8.0.pl
+
+chmod 755 unitas_1.8.0.pl
+
+cpan
+install Archive::Extract
+exit
+
+# LWP::Protocol::https already installed 
+perldoc -l LWP::Protocol::https
+
+# Get maize database
+perl unitas_1.8.0.pl  -refdump -species Zea_mays
+
+# Run UNITAS on sRNA sequences
+perl unitas_1.8.0.pl -input <fasta.fa> -species Zea_mays
+
+# Integrate TE annotation in UNITAS output
+
+# Download B73 NAM5 TE annotation
+wget https://raw.githubusercontent.com/oushujun/MTEC/master/maizeTE02052020
+
+# I just need to add the prefix "TE|" so that Unitas classifies the mapped sRNAs in the TE category
+seqkit replace -p ^ -r "TE|" maizeTE02052020.fa > maizeTE02052020_renamed.fa
+
+# Rename headers of input fasta file with a running number to avoid issue with UNITAS
+seqkit replace -p .+ -r "seq_{nr}" input_sRNAs.fa > input_sRNAs.renamed.fa
+
+perl unitas_1.8.0.pl -input input_sRNAs.renamed.fa -refseq maizeTE02052020_renamed.fa -species Zea_mays
+
+# UNITAS creates a folder with the HTML reports and all output files of the analysis
+
+```
+
+
+At the time of the analysis, here are the different versions of the databases we had:
+
+```
+SeqMap version/date: ...................... 1.0.13
+Genomic tRNA database version/date: ....... 24.01.2019 (dd.mm.yyyy)
+piRNA cluster database version/date: ...... 20.10.2023 (dd.mm.yyyy)
+Ensembl version/date: ..................... Release 96
+EnsemblGenomes version/date: .............. Release 43
+tRF-1 sequence data version/date: ......... 09.04.2019 (dd.mm.yyyy)
+tRNA-leader sequence data version/date: ... 09.04.2019 (dd.mm.yyyy)
+SILVA rRNA (SSU) database version/date: ... Release 132
+miRBase database version/date: ........ Release 22
+SeqMap version/date: ...................... 1.0.13
+```
+
+Add TE annotation using the `-refseq` argument. Unitas requires a fasta file with header having the type first, followed by pipe sign.
+
+```{bash, eval=FALSE}
+
+cd /home/zicola/bin/unitas
+
+# Get TE maize annotation
+wget -O maizeTE02052020.fa https://raw.githubusercontent.com/oushujun/MTEC/master/maizeTE02052020
+
+# I just need to add the prefix "TE|" so that Unitas classifies the mapped sRNAs in the TE category
+seqkit replace -p ^ -r "TE|" maizeTE02052020.fa > maizeTE02052020_renamed.fa
+
+perl unitas_1.8.0.pl -input <fasta_input> -refseq maizeTE02052020_renamed.fa -species Zea_mays
+
+```
+
+
+# Expression analysis
+
+To perform the PCA of sRNAs expression across the three compartments, we considered every sRNA sequence has a gene and looked at the read count across all samples. We gathered these raw read count into a matrix that can then be processed into DESeq2 as a standard gene read count matrix.
+
+
