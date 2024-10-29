@@ -548,30 +548,58 @@ ggplot(df_F5_SC_pollen_RPM_size, aes(x=size, y=RPM, group=tissue, color=tissue))
 ## Intersect F5-SC
 
 ```{r}
-df_F5_RPM_F5_SC <- df_F5_RPM %>% filter(sequence %in% df_SC_RPM$sequence)
+
+F5_SC_overlap <- intersect(df_F5_RPM$sequence, df_SC_RPM$sequence)
+
+df_F5_RPM_F5_SC <- df_F5_RPM %>% filter(sequence %in% F5_SC_overlap)
 saveRDS(df_F5_RPM_F5_SC, "data/df_F5_RPM_intersect.Rds")
+
+df_SC_RPM_F5_SC <- df_SC_RPM %>% filter(sequence %in% F5_SC_overlap)
+saveRDS(df_SC_RPM_F5_SC, "data/df_SC_RPM_intersect.Rds")
+
 ```
 
 22,408 sRNAs are found in both SC and F5.
 
+
 ```{r}
 
-ggplot(df_F5_RPM_F5_SC, aes(x=size, y=RPM)) + 
-  geom_bar(stat="identity", fill="#33A02C") +
+df_F5_RPM_F5_SC_size <- df_F5_RPM_F5_SC  %>% group_by(size) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% 
+  arrange(RPM)
+
+df_SC_RPM_F5_SC_size <-  df_SC_RPM_F5_SC %>% group_by(size) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% 
+  arrange(RPM)
+  
+# Create a dataframes containing all 3 together
+df_F5_RPM_F5_SC_size$tissue <- "F5"
+df_SC_RPM_F5_SC_size$tissue <- "SC"
+
+df_F5_SC_RPM_F5_SC_size <- rbind(df_F5_RPM_F5_SC_size, df_SC_RPM_F5_SC_size)
+
+df_F5_SC_RPM_F5_SC_size$tissue <- as.factor(df_F5_SC_RPM_F5_SC_size$tissue)
+
+# order tissue
+df_F5_SC_RPM_F5_SC_size$tissue <- factor(df_F5_SC_RPM_F5_SC_size$tissue, 
+                                          levels=c("pollen","SC","F5"), ordered=T)
+
+ggplot(df_F5_SC_RPM_F5_SC_size, aes(x=size, y=RPM, group=tissue, color=tissue)) + 
+  geom_point() +  
+  geom_line() + 
   theme_bw() + 
   ylab("RPM") + 
   xlab("Size in nt") + 
-  ggtitle("sRNAs expression F5-SC intersect") +  
+  scale_color_manual(values=c("#1f78b4", "#b2df8a"))  + 
+  ggtitle("RPM F5-SC (n=22,408)") +  
   theme(axis.text.x = element_text(color="black"),
         axis.text.y = element_text(color="black"),
         axis.ticks = element_line(color = "black")) + 
-  theme(plot.title = element_text(hjust = 0.5))
-
+  theme(plot.title = element_text(hjust = 0.5)) 
 
 ```
 
-![](images/sRNA_expression_F5_SC_intersect.png)
-
+![](images/RPM_F5_SC.png)
 
 Venn Diagram of the overlap with SC sRNAs:
 
@@ -708,9 +736,7 @@ write_delim(df_F5_RPM_F5_SC_tRF, "data/df_F5_RPM_F5_SC_tRF.txt", delim="\t")
 
 ```
 
-801 observations retrieved from the 8690 sRNAs mapping tRNA genes
-
-#### Map per tRNA types
+801 observations retrieved from the 5063 sRNAs mapping tRNA genes.
 
 ```{r}
 
@@ -743,6 +769,14 @@ df_F5_RPM_F5_SC_tRF_top_6 <- df_F5_RPM_F5_SC_tRF %>% filter(tRNA %in% top_6_tRNA
 df_F5_RPM_F5_SC_tRF_top_6$tRNA <- factor(df_F5_RPM_F5_SC_tRF_top_6$tRNA, 
                                          levels=top_6_tRNA$tRNA, ordered=TRUE)
 
+
+
+```
+
+
+### Expression tDR top 6 F5
+
+```{r}
 # Restrict to 30-34 and summarize by group to avoid little lines within the plot
 df_F5_RPM_F5_SC_tRF_top_6 %>% filter(size %in% c(30:34)) %>%  
   group_by(size,tRNA,  .groups='drop') %>% summarize(RPM=sum(RPM)) %>% 
@@ -756,10 +790,100 @@ df_F5_RPM_F5_SC_tRF_top_6 %>% filter(size %in% c(30:34)) %>%
         axis.ticks = element_line(color = "black")) + 
   theme(plot.title = element_text(hjust = 0.5)) + 
   scale_y_continuous(labels = scales::comma_format())
+```
+
+
+
+![](images/top_6_tDRs_F5.png)
+
+
+Expression of tDRs in F5, SC, and pollen
+
+
+
+### F5 tDRs expression
+
+```{r}
+# Merge dataframe
+df_F5_RPM_tRF <- merge(df_F5_RPM, tRFs_18_37nt_annotate, by="sequence")
+
+df_F5_RPM_tRF_per_type <- df_F5_RPM_tRF %>% group_by(tRNA) %>% 
+  summarize(RPM=sum(RPM)) %>% arrange(RPM)
+
+# Reorganize tRNA by decreasing RPM_sum
+df_F5_RPM_tRF_per_type$tRNA <- factor(df_F5_RPM_tRF_per_type$tRNA, levels=df_F5_RPM_tRF_per_type$tRNA[order(df_F5_RPM_tRF_per_type$RPM, decreasing = TRUE)])
+
+df_F5_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
+  geom_bar(stat="identity", fill="grey") + 
+  theme_bw() + 
+  ylab("RPM") + 
+  xlab("tRNA gene mapped") + 
+  ggtitle("RPM F5 mapping tRNA, F5 expression") + 
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_y_continuous(labels = scales::comma_format())
 
 ```
 
-![](images/top_6_tDRs_F5.png)
+![](images/RPM_tDR_F5.png)
+
+### SC tDRs expression
+
+```{r}
+# Merge dataframe
+df_SC_RPM_tRF <- merge(df_SC_RPM, tRFs_18_37nt_annotate, by="sequence")
+
+df_SC_RPM_tRF_per_type <- df_SC_RPM_tRF %>% group_by(tRNA) %>% 
+  summarize(RPM=sum(RPM)) %>% arrange(RPM)
+
+# Reorganize tRNA by decreasing RPM_sum
+df_SC_RPM_tRF_per_type$tRNA <- factor(df_SC_RPM_tRF_per_type$tRNA, levels=df_SC_RPM_tRF_per_type$tRNA[order(df_SC_RPM_tRF_per_type$RPM, decreasing = TRUE)])
+
+df_SC_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
+  geom_bar(stat="identity", fill="grey") + 
+  theme_bw() + 
+  ylab("RPM") + 
+  xlab("tRNA gene mapped") + 
+  ggtitle("RPM SC mapping tRNA, SC expression") + 
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_y_continuous(labels = scales::comma_format())
+
+```
+
+![](images/RPM_tDR_SC.png)
+
+### Pollen tDRs expression
+
+```{r}
+# Merge dataframe
+df_pollen_RPM_tRF <- merge(df_pollen_RPM, tRFs_18_37nt_annotate, by="sequence")
+
+df_pollen_RPM_tRF_per_type <- df_pollen_RPM_tRF %>% group_by(tRNA) %>% 
+  summarize(RPM=sum(RPM)) %>% arrange(RPM)
+
+# Reorganize tRNA by decreasing RPM_sum
+df_pollen_RPM_tRF_per_type$tRNA <- factor(df_pollen_RPM_tRF_per_type$tRNA, levels=df_pollen_RPM_tRF_per_type$tRNA[order(df_pollen_RPM_tRF_per_type$RPM, decreasing = TRUE)])
+
+df_pollen_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
+  geom_bar(stat="identity", fill="grey") + 
+  theme_bw() + 
+  ylab("RPM") + 
+  xlab("tRNA gene mapped") + 
+  ggtitle("RPM pollen mapping tRNA, pollen expression") + 
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_y_continuous(labels = scales::comma_format())
+
+```
+
+![](images/RPM_tDR_pollen.png)
 
 
 ## UNITAS analysis
@@ -826,33 +950,46 @@ miRBase database version/date: ........ Release 22
 SeqMap version/date: ...................... 1.0.13
 ```
 
-
-
-
-
-
 ## Expression by category
 
 ```{r}
 
-df_F5_RPM_F5_SC_tRF_rRF <- df_F5_RPM_F5_SC %>% mutate(category=ifelse((sequence %in% tRFs_18_37nt_annotate$s), "tRNA", ifelse((sequence %in% df_rRFs$s), "rRNA","others")))
+# Download fasta sequences annotated as rRNA by UNITAS
+df_rRFs <- fasta_to_df("data/unitas/fasta/unitas.rRNA.fas")
+
+df_F5_RPM_F5_SC_tRF_rRF <- df_F5_RPM_F5_SC %>% 
+  mutate(category=ifelse((sequence %in% tRFs_18_37nt_annotate$s), 
+                         "tRNA", ifelse((sequence %in% df_rRFs$s), "rRNA","others")))
 
 df_F5_RPM_F5_SC_tRF_rRF$category <- as.factor(df_F5_RPM_F5_SC_tRF_rRF$category)
 
-df_F5_RPM_F5_SC_tRF_rRF_size <- df_F5_RPM_F5_SC_tRF_rRF %>% group_by(size, category) %>% summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% arrange(RPM)
+df_F5_RPM_F5_SC_tRF_rRF_size <- df_F5_RPM_F5_SC_tRF_rRF %>% 
+  group_by(size, category) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% 
+  arrange(RPM)
 
 # Move categories around
 # Change order of the samples for plotting
-df_F5_RPM_F5_SC_tRF_rRF_size$category <- factor(df_F5_RPM_F5_SC_tRF_rRF_size$category, levels = c("rRNA", "tRNA","others"))
+df_F5_RPM_F5_SC_tRF_rRF_size$category <- factor(df_F5_RPM_F5_SC_tRF_rRF_size$category, 
+                                                levels = c("rRNA", "tRNA","others"))
 
 
-ggplot(df_F5_RPM_F5_SC_tRF_rRF_size, aes(x=size, y=RPM, fill=category)) + geom_bar(stat="identity") + theme_bw() + ylab("RPM") + xlab("Size") + ggtitle("RPM F5-SC 22,408, F5 expression") + scale_fill_manual(values=c("#d8b365", "#998ec3","#5ab4ac")) + theme(plot.title = element_text(hjust = 0.5))  +
-  theme(axis.text.x = element_text(color="black"),axis.text.y = element_text(color="black"),axis.ticks = element_line(color = "black"))+ scale_y_continuous(labels = scales::comma_format()) 
+ggplot(df_F5_RPM_F5_SC_tRF_rRF_size, aes(x=size, y=RPM, fill=category)) + 
+  geom_bar(stat="identity") + 
+  theme_bw() + ylab("RPM") + 
+  xlab("Size") + 
+  ggtitle("F5-SC sRNAs expression in F5 (n=22,408)") + 
+  scale_fill_manual(values=c("#d8b365", "#998ec3","#5ab4ac")) + 
+  theme(plot.title = element_text(hjust = 0.5))  +
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black"))+ 
+  scale_y_continuous(labels = scales::comma_format()) 
 
 ```
 
 
-
+![](images/RPM_F5_SC_per_category.png)
 
 
 
