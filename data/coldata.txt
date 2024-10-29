@@ -1,0 +1,9 @@
+sample	tissue
+F5_1	F5
+F5_2	F5
+F5_3	F5
+SC_1	SC
+SC_2	SC
+SC_3	SC
+pollen_1	pollen
+pollen_2	pollen

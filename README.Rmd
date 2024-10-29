@@ -36,6 +36,49 @@ R packages:
 
 * DESeq2 (v1.28.1)
 
+
+```{r}
+library("tidyverse")
+library("ggplot2")
+library("ggpubr")
+library("gghighlight")
+library("DESeq2")
+library("Biostrings")
+
+
+fasta_to_df <- function(path){
+  fasta = readLines(path)
+  ids = grepl(">", fasta)
+  f = data.frame(
+    id = sub(">", "", fasta[ids]),
+    sequence = tapply(fasta[!ids], cumsum(ids)[!ids], function(x) {
+      paste(x, collapse = "")
+    }))
+  return(f)
+}
+
+make_fasta <-  function(vector_sequence, path_output, sequence_names){
+  if(is.vector(vector_sequence)){
+    len_seq <- length(vector_sequence)
+    Xfasta <- character(len_seq * 2)
+    if(missing(sequence_names)){
+      Xfasta[c(TRUE, FALSE)] <- paste0(">seq", 1:len_seq)
+    } else {
+      Xfasta[c(TRUE, FALSE)] <- sequence_names
+    }
+    Xfasta[c(FALSE, TRUE)] <- as.character(vector_sequence)
+    writeLines(Xfasta, path_output)
+  } 
+  else {
+      stop("Argument is not a vector")
+    }
+}
+
+# Source function for GO analysis
+source("S:/git_repositories/GOMAP_maize_B73_NAM5/go_functions.R", chdir = T)
+```
+
+
 # Data availability
 
 All data can be download on NCBI (PRJNA1077103)
@@ -110,11 +153,18 @@ We consider only sRNAs mapping without mismatch to the B73 NAM5 assembly (chromo
 # Collapse the sequences
 fastx_collapser -i <input_reads> -o <collapsed.fa>
 
-# Get B73 NAM5 genome
+# Get B73 NAM5 genome (chromosomes and contigs)
 wget https://download.maizegdb.org/Zm-B73-REFERENCE-NAM-5.0/Zm-B73-REFERENCE-NAM-5.0.fa.gz
 
+# Get chloroplast sequence (KF241981.1, https://www.ncbi.nlm.nih.gov/nuccore/KF241981)
+
+# Get mitochondrial sequence (AY506529.1, https://www.ncbi.nlm.nih.gov/nuccore/AY506529.1)
+
+# Concatenate all fasta sequences
+cat Zm-B73-REFERENCE-NAM-5.0.fa chloroplast.fa mitochondria.fa > NAM5_Pt_Mt.fa
+
 # Index genome
-bowtie-build -f Zm-B73-REFERENCE-NAM-5.0.fa index_Zm_B73_NAM5 
+bowtie-build -f NAM5_Pt_Mt.fa index_Zm_B73_NAM5 
 
 # Map the reads without any mismatch allowed
 bowtie -S -l 37 -n 0 -x index_Zm_B73_NAM5 --threads 8 -f <collapsed.fa> | \
@@ -241,13 +291,15 @@ perl unitas_1.8.0.pl -input <fasta.fa> -species Zea_mays
 # Download B73 NAM5 TE annotation
 wget https://raw.githubusercontent.com/oushujun/MTEC/master/maizeTE02052020
 
-# I just need to add the prefix "TE|" so that Unitas classifies the mapped sRNAs in the TE category
+# I just need to add the prefix "TE|" so that Unitas 
+# classifies the mapped sRNAs in the TE category
 seqkit replace -p ^ -r "TE|" maizeTE02052020.fa > maizeTE02052020_renamed.fa
 
 # Rename headers of input fasta file with a running number to avoid issue with UNITAS
 seqkit replace -p .+ -r "seq_{nr}" input_sRNAs.fa > input_sRNAs.renamed.fa
 
-perl unitas_1.8.0.pl -input input_sRNAs.renamed.fa -refseq maizeTE02052020_renamed.fa -species Zea_mays
+perl unitas_1.8.0.pl -input input_sRNAs.renamed.fa \
+    -refseq maizeTE02052020_renamed.fa -species Zea_mays
 
 # UNITAS creates a folder with the HTML reports and all output files of the analysis
 
@@ -281,13 +333,174 @@ wget -O maizeTE02052020.fa https://raw.githubusercontent.com/oushujun/MTEC/maste
 # I just need to add the prefix "TE|" so that Unitas classifies the mapped sRNAs in the TE category
 seqkit replace -p ^ -r "TE|" maizeTE02052020.fa > maizeTE02052020_renamed.fa
 
-perl unitas_1.8.0.pl -input <fasta_input> -refseq maizeTE02052020_renamed.fa -species Zea_mays
+perl unitas_1.8.0.pl -input <fasta_input> \
+    -refseq maizeTE02052020_renamed.fa -species Zea_mays
 
 ```
 
 
 # Expression analysis
 
-To perform the PCA of sRNAs expression across the three compartments, we considered every sRNA sequence has a gene and looked at the read count across all samples. We gathered these raw read count into a matrix that can then be processed into DESeq2 as a standard gene read count matrix.
+To perform the PCA of sRNAs expression across the three types compartments, we considered every sRNA sequence has a gene and looked at the read count across all samples. We gathered these raw read count into a matrix that can then be processed into DESeq2 as a standard gene read count matrix.
+
+
+### Format data
+
+Use collapsed reads by `fastx_collapser` which gives the sequence and the number of times it occurs in a given sample with the number of occurences within the fasta header.
+
+Example:
+
+```
+>1-460089
+TGCAAATCTAACGAAGTGCTCCTGGACG
+>2-206928
+CGTTATTTTACTTATTCCGTGGGTCGGAAGCGGGGCA
+>3-195873
+TTAACACATGCAAATCTAACGAAGTGCTCCTGGACG
+```
+The first sequence `TGCAAATCTAACGAAGTGCTCCTGGACG` occurs 460,089 in the collapsed fasta input.
+
+Convert the fasta format so that the number of occurrences comes right after the sequence:
+
+```
+TGCAAATCTAACGAAGTGCTCCTGGACG 460089
+CGTTATTTTACTTATTCCGTGGGTCGGAAGCGGGGCA 206928
+TTAACACATGCAAATCTAACGAAGTGCTCCTGGACG 195873
+```
+
+```{bash, eval=FALSE}
+
+# Format and sort data by sequence name
+for i in *.collapsed.fa; do
+  prefix=$(basename ${i%%.*})
+  awk -v RS='\n>' -v ORS='\n>' -v OFS='' -F'\n' '{$1=$1 "\t"}1' $i | \
+          awk 'BEGIN {FS = "-"}{print $2}' | awk '{print $2"\t"$1}' | \
+          sed '$ d' | sort -k1,1  > $output/${prefix}.txt
+done
+
+```
+
+### Merge data
+
+Merge all raw read count into one large matrix with samples in columns and sequence in rows. We used a java script that creates a bash command using the unix function `join`. The bash script is then launched and the output files are `merged_dataset.csv` and `merged_dataset_with_header.csv`, the only difference being the added header in the latter.
+
+```{bash, eval=FALSE}
+
+# Convert underscore in hyphens so they suffix stay in the header
+rename 's/_/-/' *txt
+# Do it twice for the second underscore
+rename 's/_/-/' *txt
+
+# specific the absolute path (. for current directory creates a bug). 
+# Don't forget the final slash
+java -jar scripts/GenerateDatasetJoinShellScript/dist/GenerateDatasetJoinShellScript.jar \
+    -fileEnding txt -directory /path/to/directory/
+
+# Remove txt suffix that are added in header of the file
+sed -i 's/\.txt//g' header.csv
+
+bash merge_datasets.sh
+
+```
+
+
+### Filter read count
+
+```{bash, eval=FALSE}
+
+# Most sRNAs have a row sum of 1, indicating they are present in only one sample with one read count. 
+# These are not going to help with the analysis so I can discard them
+awk '{x=0;for(i=2;i<=NF;i++)x=x+$i} x>1 {print $0}' merged_dataset.csv > cts.txt
+
+wc -l merged_dataset.csv
+5634337
+
+wc -l cts.txt
+1836113
+# about 3x less sRNAs after filtering
+
+# I need to remove the name of the first column (sequence)
+sed -i 's/sequence//' header.csv
+# Put back underscores in header
+sed -i 's/-/_/g' header.csv
+
+# Add header
+cat header.csv cts.txt > cts_with_header.txt
+
+```
+
+
+Create coldata.txt file in excel and copy it in text file:
+
+```
+sample tissue
+F5_1   F5
+F5_2   F5
+F5_3   F5
+SC_1   SC
+SC_2   SC
+SC_3   SC
+pollen_1 pollen
+pollen_2 pollen
+```
+
+### PCA small RNA expression
+
+```{r}
+# Import the cts matrix (not gene name is now the row name => required)
+cts <- read.table("data/cts_with_header.txt", header=TRUE, row.names=1, check.names = FALSE)
+
+# Create a more compact R object
+saveRDS(cts,"data/cts.Rds")
+
+cts <- readRDS("data/cts.Rds")
+
+# Upload the coldata file
+coldata <- read.table ("data/coldata.txt", header=T)
+
+# Convert the variables into factors (https:/www.listendata.com/2015/05/converting-multiple-numeric-variables.html)
+col_names <- names(coldata)
+coldata[,col_names] <- lapply(coldata[,col_names] , factor)
+
+### Check that sample names match in both files
+all(colnames(cts) %in% coldata$sample)
+
+```
+
+```{r}
+
+# Create a DESeqDataSet object
+dds <- DESeqDataSetFromMatrix(countData = cts,
+                              colData = coldata,
+                              design= ~tissue)
+
+# Variance stabilizing transformation
+vsd <- vst(dds, blind=FALSE)
+
+# Create PCA
+pcaData <- plotPCA(vsd, intgroup=c("sample", "tissue"), returnData=TRUE)
+
+# Get percentage variation
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+p <- ggplot(pcaData, aes(PC1, PC2, color=tissue)) +  
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) + 
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) +  
+  theme_bw() +  
+  scale_color_manual(values=c("#b2df8a", "#a6cee3", "#1f78b4")) + 
+  ggtitle("PCA sRNA expression") + 
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+p + geom_point(size = 4)
+
+```
+
+![](images/PCA_sRNA.png)
+
+# Read per million analysis
+
 
 
