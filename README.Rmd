@@ -32,13 +32,13 @@ geometry: margin=1in
 * R (v4.3.2)
 * seqkit (v2.5.1)
 
-R packages:
+# R libraries
 
 * DESeq2 (v1.28.1)
 
-
 ```{r}
 library("tidyverse")
+library("DESeq2")
 library("ggplot2")
 library("ggpubr")
 library("gghighlight")
@@ -112,7 +112,6 @@ while read name; do
 done < SRR_Acc_List.txt
 
 ```
-
 
 
 # sRNA analysis
@@ -266,8 +265,7 @@ pooled_SC_Fr5.intersect_min_2.fa  FASTA   DNA     22,408  609,987       18     2
 
 To perform the PCA of sRNAs expression across the three types compartments, we considered every sRNA sequence has a gene and looked at the read count across all samples. We gathered these raw read count into a matrix that can then be processed into DESeq2 as a standard gene read count matrix.
 
-
-### Format data
+## Format data
 
 Use collapsed reads by `fastx_collapser` which gives the sequence and the number of times it occurs in a given sample with the number of occurences within the fasta header.
 
@@ -302,7 +300,7 @@ done
 
 ```
 
-### Merge data
+## Merge data
 
 Merge all raw read count into one large matrix with samples in columns and sequence in rows. We used a java script that creates a bash command using the unix function `join`. The bash script is then launched and the output files are `merged_dataset.csv` and `merged_dataset_with_header.csv`, the only difference being the added header in the latter.
 
@@ -325,7 +323,7 @@ bash merge_datasets.sh
 ```
 
 
-### Filter read count
+## Filter read count
 
 ```{bash, eval=FALSE}
 # Most sRNAs have a row sum of 1, indicating they are present in only one sample with one read count. 
@@ -366,7 +364,7 @@ pollen_1 pollen
 pollen_2 pollen
 ```
 
-### PCA small RNA expression
+## PCA small RNA expression
 
 ```{r}
 # Import the cts matrix (not gene name is now the row name => required)
@@ -423,7 +421,7 @@ p + geom_point(size = 4)
 
 ![](images/PCA_sRNA.png)
 
-# Reads per million analysis
+## Reads per million analysis
 
 Normalize raw read count into reads per million to compare samples with each other. Only small RNAs found in at least two biological replicates are considered.
 
@@ -486,6 +484,12 @@ saveRDS(df_F5_RPM, "data/df_F5_RPM.Rds")
 saveRDS(df_SC_RPM, "data/df_SC_RPM.Rds")
 saveRDS(df_pollen_RPM, "data/df_pollen_RPM.Rds")
 
+# Load RDS
+df_F5_RPM <- readRDS("data/df_F5_RPM.Rds")
+df_SC_RPM <- readRDS("data/df_SC_RPM.Rds")
+df_pollen_RPM <- readRDS("data/df_pollen_RPM.Rds")
+
+
 # Group dataframes per size to make plot faster
 df_F5_RPM_size <- df_F5_RPM %>% group_by(size) %>% 
   summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% 
@@ -513,6 +517,9 @@ df_F5_SC_pollen_RPM_size$tissue <- factor(df_F5_SC_pollen_RPM_size$tissue,
                                           levels=c("pollen","SC","F5"), ordered=T)
 
 saveRDS(df_F5_SC_pollen_RPM_size, "data/df_F5_SC_pollen_RPM_size.Rds")
+
+df_F5_SC_pollen_RPM_size <- readRDS("data/df_F5_SC_pollen_RPM_size.Rds")
+
 ```
 
 We have a total of unique sRNA sequences of: 
@@ -774,7 +781,7 @@ df_F5_RPM_F5_SC_tRF_top_6$tRNA <- factor(df_F5_RPM_F5_SC_tRF_top_6$tRNA,
 ```
 
 
-### Expression tDR top 6 F5
+## Expression tDR top 6 F5
 
 ```{r}
 # Restrict to 30-34 and summarize by group to avoid little lines within the plot
@@ -801,7 +808,7 @@ Expression of tDRs in F5, SC, and pollen
 
 
 
-### F5 tDRs expression
+## F5 tDRs expression
 
 ```{r}
 # Merge dataframe
@@ -829,7 +836,7 @@ df_F5_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% ggplot(aes(x=tRNA
 
 ![](images/RPM_tDR_F5.png)
 
-### SC tDRs expression
+## SC tDRs expression
 
 ```{r}
 # Merge dataframe
@@ -857,7 +864,7 @@ df_SC_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% ggplot(aes(x=tRNA
 
 ![](images/RPM_tDR_SC.png)
 
-### Pollen tDRs expression
+## Pollen tDRs expression
 
 ```{r}
 # Merge dataframe
@@ -919,6 +926,7 @@ wget https://raw.githubusercontent.com/oushujun/MTEC/master/maizeTE02052020
 # I just need to add the prefix "TE|" so that Unitas 
 # classifies the mapped sRNAs in the TE category
 seqkit replace -p ^ -r "TE|" maizeTE02052020.fa > maizeTE02052020_renamed.fa
+
 ```
 
 Add TE annotation using the `-refseq` argument. Unitas requires a fasta file with header having the type first, followed by pipe sign.
@@ -950,7 +958,9 @@ miRBase database version/date: ........ Release 22
 SeqMap version/date: ...................... 1.0.13
 ```
 
-## Expression by category
+## sRNA expression by category
+
+Use the annotation derived from the mapping on the gtrnadb tRNA database and UNITAS to display the type of sRNA expressed.
 
 ```{r}
 
@@ -991,6 +1001,366 @@ ggplot(df_F5_RPM_F5_SC_tRF_rRF_size, aes(x=size, y=RPM, fill=category)) +
 
 ![](images/RPM_F5_SC_per_category.png)
 
+
+## Analysis TEs
+
+### Mapping
+
+Use the maizeTE02052020 file used in UNITAS.
+
+```{bash, eval=FALSE}
+
+module load fastx bowtie samtools 
+
+index="/usr/users/zicola/genomes/maize_B73/B73_NAM5/TE_NAM5_annotations/TE_bowtie1_index/maizeTE02052020"
+
+srun --time=00:05:00 -c 16 --mem=20Gb bowtie -S -n 0 -l 37 $index --threads 16 -f all_sRNAs_18_37nt.fa | samtools sort | samtools view -F4 -b -o all_sRNAs_18_37nt_TEs.bam -
+
+# reads processed: 561915
+# reads with at least one reported alignment: 76739 (13.66%)
+# reads that failed to align: 485176 (86.34%)
+
+# Make a fasta file
+samtools view -b all_sRNAs_18_37nt_TEs.bam | samtools bam2fq | fastq_to_fasta -i - -o all_sRNAs_18_37nt_TEs.fa
+
+# Create a dictionary (seq name and TE name
+samtools view all_sRNAs_18_37nt_TEs.bam | cut -f1,3 > seq_2_TE.txt
+cut -d'#' -f2 seq_2_TE.txt > family
+paste seq_2_TE.txt family > seq_2_TE_family.txt
+
+```
+
+
+```{r}
+
+# Import fasta
+df_TEs <- fasta_to_df("data/all_sRNAs_18_37nt_TEs.fa")
+
+# Import database
+seq_2_TE_family <- read.delim("data/seq_2_TE_family.txt", header=FALSE)
+
+colnames(seq_2_TE_family) <- c("id","TE","TE_family")
+
+df_TEs_annotated <- merge.data.frame(df_TEs, seq_2_TE_family, by="id")
+
+```
+
+
+```{r}
+# F5-SC intersect in F5
+df_F5_RPM_F5_SC <- readRDS("data/df_F5_RPM_intersect.Rds")
+
+df_F5_RPM_F5_SC_TE <- merge.data.frame(df_TEs_annotated, df_F5_RPM_F5_SC, by="sequence")
+# 594
+
+# F5
+df_F5_RPM <- readRDS("data/df_F5_RPM.Rds")
+
+df_F5_RPM_TE <- merge.data.frame(df_TEs_annotated, df_F5_RPM, by="sequence")
+
+# SC
+df_SC_RPM <- readRDS("data/df_SC_RPM.Rds")
+
+df_SC_RPM_TE <- merge.data.frame(df_TEs_annotated, df_SC_RPM, by="sequence")
+# 5130
+
+# Pollen
+df_pollen_RPM <- readRDS("data/df_pollen_RPM.Rds")
+
+df_pollen_RPM_TE <- merge.data.frame(df_TEs_annotated, df_pollen_RPM, by="sequence")
+# 63851
+
+```
+
+
+### Relative expression per sRNA size
+
+```{r}
+
+df_pollen_RPM_TE_size <- df_pollen_RPM_TE %>% group_by(size) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% 
+  arrange(RPM)
+
+df_pollen_RPM_TE_size$percent <- df_pollen_RPM_TE_size$RPM/sum(df_pollen_RPM_TE_size$RPM)
+
+df_SC_RPM_TE_size <- df_SC_RPM_TE %>% group_by(size) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% 
+  arrange(RPM)
+
+df_SC_RPM_TE_size$percent <- df_SC_RPM_TE_size$RPM/sum(df_SC_RPM_TE_size$RPM)
+
+df_F5_RPM_TE_size <- df_F5_RPM_TE %>% group_by(size) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% arrange(RPM)
+
+df_F5_RPM_TE_size$percent <- df_F5_RPM_TE_size$RPM/sum(df_F5_RPM_TE_size$RPM)
+
+df_F5_RPM_F5_SC_TE_size <- df_F5_RPM_F5_SC_TE  %>% 
+  group_by(size) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% arrange(RPM)
+
+df_F5_RPM_F5_SC_TE_size$percent <- df_F5_RPM_F5_SC_TE_size$RPM/sum(df_F5_RPM_F5_SC_TE_size$RPM)
+
+
+df_pollen_RPM_TE_size$compartment <- "pollen"
+df_SC_RPM_TE_size$compartment <- "SC"
+df_F5_RPM_TE_size$compartment <- "F5"
+df_F5_RPM_F5_SC_TE_size$compartment <- "F5-SC"
+
+df_all_RPM_TE_size <- rbind(df_pollen_RPM_TE_size, 
+                            df_SC_RPM_TE_size, df_F5_RPM_TE_size, df_F5_RPM_F5_SC_TE_size)
+
+df_all_RPM_TE_size$compartment <- factor(df_all_RPM_TE_size$compartment, 
+                                         levels = c("pollen","SC","F5","F5-SC"))
+
+
+ggplot(df_all_RPM_TE_size, aes(x=size, y=percent, fill=compartment)) + 
+  geom_bar(stat="identity", position="dodge2") + theme_bw() + 
+  ylab("Percent RPM per size") + 
+  xlab("Size") + 
+  ggtitle("Relative expression of TE-mapped sRNAs per size") + 
+  scale_y_continuous(labels=scales::percent) + 
+  scale_fill_manual(values=c("#a6cee3", "#1f78b4", "#b2df8a","#33a02c")) + 
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+```
+
+![](images/relative_expression_TE_per_size.png)
+
+### Relative expression per TE family
+
+```{r}
+
+df_F5_RPM_F5_SC_TE_per_family <- df_F5_RPM_F5_SC_TE %>% group_by(TE_family) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') 
+
+df_F5_RPM_F5_SC_TE_per_family$TE_family <- factor(df_F5_RPM_F5_SC_TE_per_family$TE_family, 
+levels = df_F5_RPM_F5_SC_TE_per_family$TE_family[order(df_F5_RPM_F5_SC_TE_per_family$RPM, decreasing = TRUE)])
+
+df_F5_RPM_TE_per_family <- df_F5_RPM_TE %>% group_by(TE_family) %>% summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') 
+
+df_F5_RPM_TE_per_family$TE_family <- factor(df_F5_RPM_TE_per_family$TE_family, 
+levels = df_F5_RPM_TE_per_family$TE_family[order(df_F5_RPM_TE_per_family$RPM, decreasing = TRUE)])
+
+df_SC_RPM_TE_per_family <- df_SC_RPM_TE %>% group_by(TE_family) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') 
+
+df_SC_RPM_TE_per_family$TE_family <- factor(df_SC_RPM_TE_per_family$TE_family, 
+                                            levels = df_SC_RPM_TE_per_family$TE_family[order(df_SC_RPM_TE_per_family$RPM, decreasing = TRUE)])
+
+
+df_pollen_RPM_TE_per_family <- df_pollen_RPM_TE %>% group_by(TE_family) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') 
+
+df_pollen_RPM_TE_per_family$TE_family <- factor(df_pollen_RPM_TE_per_family$TE_family, 
+levels = df_pollen_RPM_TE_per_family$TE_family[order(df_pollen_RPM_TE_per_family$RPM, decreasing = TRUE)])
+
+df_F5_RPM_F5_SC_TE_per_family$compartment <- "F5-SC"
+df_F5_RPM_TE_per_family$compartment <- "F5"
+df_SC_RPM_TE_per_family$compartment <- "SC"
+df_pollen_RPM_TE_per_family$compartment <- "pollen"
+
+df_F5_RPM_F5_SC_TE_per_family$percent <- df_F5_RPM_F5_SC_TE_per_family$RPM/sum(df_F5_RPM_F5_SC_TE_per_family$RPM)
+df_F5_RPM_TE_per_family$percent <- df_F5_RPM_TE_per_family$RPM/sum(df_F5_RPM_TE_per_family$RPM)
+df_SC_RPM_TE_per_family$percent <- df_SC_RPM_TE_per_family$RPM/sum(df_SC_RPM_TE_per_family$RPM)
+df_pollen_RPM_TE_per_family$percent <- df_pollen_RPM_TE_per_family$RPM/sum(df_pollen_RPM_TE_per_family$RPM)
+
+df_all_RPM_TE_per_family <- rbind(df_F5_RPM_F5_SC_TE_per_family, 
+                                  df_F5_RPM_TE_per_family, df_SC_RPM_TE_per_family, 
+                                  df_pollen_RPM_TE_per_family)
+
+df_all_RPM_TE_per_family$compartment <- factor(df_all_RPM_TE_per_family$compartment, 
+                                               levels = c("pollen","SC","F5","F5-SC"))
+
+ggplot(df_all_RPM_TE_per_family, aes(x=TE_family, y=percent, fill=compartment)) + 
+  geom_bar(stat="identity", position="dodge") + 
+  theme_bw() + 
+  ylab("Percent RPM per compartment") + 
+  xlab("TE family") +  
+  ggtitle("Relative expression of TE-mapped sRNAs per TE family") + 
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +  
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_y_continuous(labels=scales::percent) +  
+  scale_fill_manual(values=c("#a6cee3", "#1f78b4", "#b2df8a","#33a02c"))
+
+```
+
+
+![](images/relative_expression_TE_per_TE_family.png)
+
+## miRNA expression analysis
+
+
+```{bash, eval=FALSE}
+
+cd data/unitas/
+
+cut -f1,2 unitas.miR-table_Zea_mays.txt > unitas.miR-table_Zea_mays.id_seq.txt
+
+cut -f1 unitas.miR-table_Zea_mays.id_seq.txt | cut -d- -f1 | sed 's/[a-z]$//g' > unitas.miR-table_Zea_mays.id_seq_family.txt
+
+paste unitas.miR-table_Zea_mays.id_seq.txt unitas.miR-table_Zea_mays.id_seq_family.txt > unitas.miR-table_Zea_mays.id_seq_family.all.txt
+
+```
+
+```{r}
+
+df_unitas_miRNA_annotation <- read.delim("data/unitas/unitas.miR-table_Zea_mays.id_seq_family.all.txt")
+
+colnames(df_unitas_miRNA_annotation) <- c("miRNA","sequence","family")
+df_unitas_miRNA_annotation$family <- as.factor(df_unitas_miRNA_annotation$family)
+
+# Remove all miRNAs with SNPs
+df_unitas_miRNA_annotation <- df_unitas_miRNA_annotation %>% filter(!grepl("\\(", miRNA))
+
+df_SC_RPM_miRNA <- merge.data.frame(df_SC_RPM, df_unitas_miRNA_annotation, by="sequence")
+df_pollen_RPM_miRNA <- merge.data.frame(df_pollen_RPM, df_unitas_miRNA_annotation, by="sequence")
+df_F5_RPM_miRNA <- merge.data.frame(df_F5_RPM, df_unitas_miRNA_annotation, by="sequence")
+df_F5_RPM_F5_SC_RPM_miRNA <- merge.data.frame(df_F5_RPM_F5_SC, df_unitas_miRNA_annotation, by="sequence")
+
+list_miRNA_df <- list(pollen=df_pollen_RPM_miRNA, SC=df_SC_RPM_miRNA, F5=df_F5_RPM_miRNA, F5_SC=df_F5_RPM_F5_SC_RPM_miRNA)
+
+# Export df_F5_RPM_F5_SC_RPM_miRNA
+#write_delim(df_F5_RPM_F5_SC_RPM_miRNA, "data/df_F5_RPM_F5_SC_RPM_miRNA.txt")
+
+
+```
+
+
+### Expression of F5-SC sRNAs across tissues
+
+```{r}
+summary_df <- function(df, name){
+  df_family <- df %>% group_by(family) %>% summarize(RPM=sum(RPM))
+  df_family$compartment <- name
+  return(df_family)
+}
+
+df_pollen_RPM_miRNA_family <- summary_df(list_miRNA_df[[1]],"pollen")
+df_SC_RPM_miRNA_family <- summary_df(list_miRNA_df[[2]],"SC")
+df_F5_RPM_miRNA_family <- summary_df(list_miRNA_df[[3]],"F5")
+df_F5_RPM_F5_SC_RPM_miRNA_family <- summary_df(list_miRNA_df[[4]],"F5_SC")
+
+
+df_all_miRNA <- rbind(df_pollen_RPM_miRNA_family, df_SC_RPM_miRNA_family, 
+                      df_F5_RPM_miRNA_family, df_F5_RPM_F5_SC_RPM_miRNA_family)
+
+df_all_miRNA$compartment <- as.factor(df_all_miRNA$compartment)
+
+
+summary_df_seq <- function(df, name){
+  df$compartment <- name
+  return(df)
+}
+
+df_pollen_RPM_miRNA_seq <- summary_df_seq(list_miRNA_df[[1]],"pollen")
+df_SC_RPM_miRNA_seq <- summary_df_seq(list_miRNA_df[[2]],"SC")
+df_F5_RPM_miRNA_seq <- summary_df_seq(list_miRNA_df[[3]],"F5")
+df_F5_RPM_F5_SC_RPM_miRNA_seq <- summary_df_seq(list_miRNA_df[[4]],"F5_SC")
+
+df_all_miRNA_seq <- rbind(df_pollen_RPM_miRNA_seq, df_SC_RPM_miRNA_seq, df_F5_RPM_miRNA_seq)
+
+
+# Order compartments
+df_all_miRNA$compartment <- factor(df_all_miRNA$compartment, levels = c("pollen", "SC", "F5", "F5_SC"))
+
+# Sort by alphnumerical orders the miRNAs
+sorted_family <- gtools::mixedsort(as.character(unique(df_all_miRNA$family)))
+
+df_all_miRNA$family <- factor(df_all_miRNA$family, levels =sorted_family)
+
+# Plot
+ggplot(df_all_miRNA, aes(x=family, y=RPM, fill=compartment)) + 
+  geom_bar(stat="identity", position="dodge2")+ 
+  theme_bw()  + 
+  ggtitle("F5-SC miRNA expression") + 
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_y_continuous(labels = scales::comma_format()) +  
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +  
+  scale_fill_manual(values=c("#a6cee3", "#1f78b4", "#b2df8a","#33a02c"))
+
+```
+
+![](images/F5_SC_intersect_miRNA_expression.png)
+
+
+
+
+
+### Subset miRNAs in F5-SC
+
+```{r}
+
+# Get all F5_SC miRNA sequences
+df_F5_SC_miRNA_seq <- df_all_miRNA_seq %>% filter(sequence %in% df_F5_RPM_F5_SC_RPM_miRNA$sequence)
+
+# Summarize by family
+df_F5_SC_RPM_miRNA_family <- df_F5_SC_miRNA_seq %>% group_by(family, compartment) %>% summarize(RPM=sum(RPM))
+
+# Discard miR2118 because it is a prediction with mismatch
+df_F5_SC_RPM_miRNA_family <-df_F5_SC_RPM_miRNA_family %>% filter(family!="miR2118")
+
+# Sort miRNA
+df_F5_SC_RPM_miRNA_family$family <- factor(df_F5_SC_RPM_miRNA_family$family, levels =c("miR156", "miR159", "miR166", "miR168", "miR396","miR444"))
+
+df_F5_SC_RPM_miRNA_family$compartment <- factor(df_F5_SC_RPM_miRNA_family$compartment, levels =c("pollen", "SC", "F5"))
+
+ggplot(df_F5_SC_RPM_miRNA_family, aes(x=family, y=RPM, fill=compartment)) + 
+  geom_bar(stat="identity", position="dodge2")+
+  ggtitle("F5-SC miRNA expression") +
+  theme_bw()  + 
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_y_continuous(labels = scales::comma_format()) +  
+  scale_fill_manual(values=c("#a6cee3", "#1f78b4", "#b2df8a"))
+
+```
+
+
+![](images/F5_SC_miRNA_expression.png)
+
+
+```{r}
+
+plot_per_family <- function(df, title){
+  df_family <- df %>% group_by(family) %>% summarize(RPM=sum(RPM))
+  df_family$family <- factor(df_family$family, 
+                             levels=df_family$family[order(df_family$RPM, decreasing = TRUE)])
+  g1 <- df_family %>% arrange(desc(RPM)) %>% 
+    ggplot(aes(x=family, y=RPM)) + 
+    geom_bar(stat="identity") + 
+    theme_bw() + ylab("RPM") + 
+    xlab("miRNA family mapped") + 
+    ggtitle(title) +  
+    theme(axis.text.x = element_text(color="black"),
+          axis.text.y = element_text(color="black"),
+          axis.ticks = element_line(color = "black")) + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_y_continuous(labels = scales::comma_format()) + 
+    theme(axis.text.x = element_text(angle=90, hjust=1))
+  return(g1)
+}
+
+g1 <- plot_per_family(list_miRNA_df[[1]],"miRNA RPM pollen (n=121)")
+g2 <- plot_per_family(list_miRNA_df[[2]],"miRNA RPM SC (n=42)")
+g3 <- plot_per_family(list_miRNA_df[[3]],"miRNA RPM F5 (n=65)")
+g4 <- plot_per_family(list_miRNA_df[[4]],"miRNA RPM F5-SC (n=20)")
+
+ggarrange(g1,g2,g3,g4, nrow=2, ncol=2)
+
+```
+
+![](images/miRNA_expression_each_tissue.png)
 
 
 # Degradome analysis
