@@ -17,12 +17,18 @@ classoption: a4paper
 geometry: margin=1in
 ---
 
+```{r, echo=FALSE}
+knitr::opts_chunk$set(eval = FALSE)
+```
+
+
 # Software dependencies
 
 * sra-toolkit (v3.0.5)
 * bedtools (v2.29.1)
 * bismark (v0.24.2)
 * Cleaveland (v4.5)
+* ViennaRNA package (v2.4.2)
 * cutadapt (v4.4)
 * fastx (v0.0.14)
 * bowtie (1.2.1.1)
@@ -31,6 +37,7 @@ geometry: margin=1in
 * trim_galore (v.0.6.10) 
 * R (v4.3.2)
 * seqkit (v2.5.1)
+
 
 # R libraries
 
@@ -64,7 +71,7 @@ make_fasta <-  function(vector_sequence, path_output, sequence_names){
     if(missing(sequence_names)){
       Xfasta[c(TRUE, FALSE)] <- paste0(">seq", 1:len_seq)
     } else {
-      Xfasta[c(TRUE, FALSE)] <- sequence_names
+      Xfasta[c(TRUE, FALSE)] <- paste0(">",sequence_names)
     }
     Xfasta[c(FALSE, TRUE)] <- as.character(vector_sequence)
     writeLines(Xfasta, path_output)
@@ -76,6 +83,68 @@ make_fasta <-  function(vector_sequence, path_output, sequence_names){
 
 # Source function for GO analysis
 source("S:/git_repositories/GOMAP_maize_B73_NAM5/go_functions.R", chdir = T)
+```
+
+```
+R version 4.0.3 (2020-10-10)
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+Running under: Windows 10 x64 (build 19045)
+
+Matrix products: default
+
+locale:
+[1] LC_COLLATE=English_United States.1252 
+[2] LC_CTYPE=English_United States.1252   
+[3] LC_MONETARY=English_United States.1252
+[4] LC_NUMERIC=C                          
+[5] LC_TIME=English_United States.1252    
+
+attached base packages:
+ [1] grid      parallel  stats4    stats     graphics  grDevices
+ [7] utils     datasets  methods   base     
+
+other attached packages:
+ [1] VennDiagram_1.7.3           futile.logger_1.4.3        
+ [3] Biostrings_2.56.0           XVector_0.28.0             
+ [5] gghighlight_0.4.1           ggpubr_0.4.0               
+ [7] DESeq2_1.28.1               SummarizedExperiment_1.18.2
+ [9] DelayedArray_0.14.1         matrixStats_1.3.0          
+[11] Biobase_2.48.0              GenomicRanges_1.40.0       
+[13] GenomeInfoDb_1.24.2         IRanges_2.22.2             
+[15] S4Vectors_0.26.1            BiocGenerics_0.34.0        
+[17] lubridate_1.9.3             forcats_1.0.0              
+[19] stringr_1.5.1               dplyr_1.1.0                
+[21] purrr_0.3.4                 readr_2.1.5                
+[23] tidyr_1.2.1                 tibble_3.2.1               
+[25] ggplot2_3.4.1               tidyverse_2.0.0            
+
+loaded via a namespace (and not attached):
+ [1] bitops_1.0-7           bit64_4.0.5            RColorBrewer_1.1-3    
+ [4] bslib_0.4.1            tools_4.0.3            backports_1.4.1       
+ [7] utf8_1.2.4             R6_2.5.1               DBI_1.2.3             
+[10] colorspace_2.1-0       withr_3.0.1            tidyselect_1.2.1      
+[13] bit_4.0.5              compiler_4.0.3         cli_3.6.2             
+[16] formatR_1.14           sass_0.4.9             labeling_0.4.3        
+[19] scales_1.3.0           genefilter_1.70.0      digest_0.6.27         
+[22] rmarkdown_2.25         pkgconfig_2.0.3        htmltools_0.5.2       
+[25] fastmap_1.1.0          rlang_1.0.6            rstudioapi_0.17.0     
+[28] RSQLite_2.3.7          jquerylib_0.1.4        farver_2.1.1          
+[31] generics_0.1.3         jsonlite_1.8.8         gtools_3.9.5          
+[34] vroom_1.6.5            BiocParallel_1.22.0    car_3.1-2             
+[37] RCurl_1.98-1.5         magrittr_2.0.3         GenomeInfoDbData_1.2.3
+[40] Matrix_1.6-5           Rcpp_1.0.12            munsell_0.5.1         
+[43] fansi_1.0.6            abind_1.4-8            lifecycle_1.0.3       
+[46] stringi_1.8.3          yaml_2.2.1             carData_3.0-5         
+[49] zlibbioc_1.34.0        blob_1.2.4             crayon_1.5.3          
+[52] lattice_0.22-6         cowplot_1.1.3          splines_4.0.3         
+[55] annotate_1.66.0        hms_1.1.3              locfit_1.5-9.4        
+[58] knitr_1.42             pillar_1.9.0           ggsignif_0.6.4        
+[61] geneplotter_1.66.0     futile.options_1.0.1   XML_3.99-0.8          
+[64] glue_1.7.0             evaluate_1.0.1         lambda.r_1.2.4        
+[67] vctrs_0.5.2            tzdb_0.4.0             gtable_0.3.1          
+[70] cachem_1.0.6           xfun_0.37              xtable_1.8-4          
+[73] broom_1.0.7            rstatix_0.7.2          survival_3.5-8        
+[76] AnnotationDbi_1.50.3   memoise_2.0.1          timechange_0.3.0   
 ```
 
 
@@ -751,7 +820,8 @@ df_F5_RPM_F5_SC_tRF_per_type <- df_F5_RPM_F5_SC_tRF %>% group_by(tRNA) %>%
   summarize(RPM=sum(RPM)) %>% arrange(RPM)
 
 # Reorganize tRNA by decreasing RPM
-df_F5_RPM_F5_SC_tRF_per_type$tRNA <- factor(df_F5_RPM_F5_SC_tRF_per_type$tRNA,
+df_F5_RPM_F5_SC_tRF_per_type$tRNA <- 
+  factor(df_F5_RPM_F5_SC_tRF_per_type$tRNA,
   levels=df_F5_RPM_F5_SC_tRF_per_type$tRNA[order(df_F5_RPM_F5_SC_tRF_per_type$RPM, decreasing = TRUE)])
 
 # frequence RPM for each category
@@ -792,7 +862,7 @@ df_F5_RPM_F5_SC_tRF_top_6 %>% filter(size %in% c(30:34)) %>%
   theme_bw() + ylab("RPM") + 
   xlab("Size") + 
   ggtitle("Top 6 most expression F5-SC tDRs in F5") + 
-  scale_fill_manual(values=c("#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#ffff33"))+
+  scale_fill_manual(values=c("#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#ffff33")) +
   theme(axis.text.x = element_text(color="black"),axis.text.y = element_text(color="black"),
         axis.ticks = element_line(color = "black")) + 
   theme(plot.title = element_text(hjust = 0.5)) + 
@@ -818,9 +888,11 @@ df_F5_RPM_tRF_per_type <- df_F5_RPM_tRF %>% group_by(tRNA) %>%
   summarize(RPM=sum(RPM)) %>% arrange(RPM)
 
 # Reorganize tRNA by decreasing RPM_sum
-df_F5_RPM_tRF_per_type$tRNA <- factor(df_F5_RPM_tRF_per_type$tRNA, levels=df_F5_RPM_tRF_per_type$tRNA[order(df_F5_RPM_tRF_per_type$RPM, decreasing = TRUE)])
+df_F5_RPM_tRF_per_type$tRNA <- 
+  factor(df_F5_RPM_tRF_per_type$tRNA, levels=df_F5_RPM_tRF_per_type$tRNA[order(df_F5_RPM_tRF_per_type$RPM, decreasing = TRUE)])
 
-df_F5_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
+df_F5_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% 
+  ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
   geom_bar(stat="identity", fill="grey") + 
   theme_bw() + 
   ylab("RPM") + 
@@ -846,9 +918,11 @@ df_SC_RPM_tRF_per_type <- df_SC_RPM_tRF %>% group_by(tRNA) %>%
   summarize(RPM=sum(RPM)) %>% arrange(RPM)
 
 # Reorganize tRNA by decreasing RPM_sum
-df_SC_RPM_tRF_per_type$tRNA <- factor(df_SC_RPM_tRF_per_type$tRNA, levels=df_SC_RPM_tRF_per_type$tRNA[order(df_SC_RPM_tRF_per_type$RPM, decreasing = TRUE)])
+df_SC_RPM_tRF_per_type$tRNA <- 
+  factor(df_SC_RPM_tRF_per_type$tRNA, levels=df_SC_RPM_tRF_per_type$tRNA[order(df_SC_RPM_tRF_per_type$RPM, decreasing = TRUE)])
 
-df_SC_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
+df_SC_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% 
+  ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
   geom_bar(stat="identity", fill="grey") + 
   theme_bw() + 
   ylab("RPM") + 
@@ -1014,7 +1088,9 @@ module load fastx bowtie samtools
 
 index="/usr/users/zicola/genomes/maize_B73/B73_NAM5/TE_NAM5_annotations/TE_bowtie1_index/maizeTE02052020"
 
-srun --time=00:05:00 -c 16 --mem=20Gb bowtie -S -n 0 -l 37 $index --threads 16 -f all_sRNAs_18_37nt.fa | samtools sort | samtools view -F4 -b -o all_sRNAs_18_37nt_TEs.bam -
+srun --time=00:05:00 -c 16 --mem=20Gb bowtie -S -n 0 -l 37 $index \
+--threads 16 -f all_sRNAs_18_37nt.fa | samtools sort | \
+samtools view -F4 -b -o all_sRNAs_18_37nt_TEs.bam -
 
 # reads processed: 561915
 # reads with at least one reported alignment: 76739 (13.66%)
@@ -1133,40 +1209,60 @@ ggplot(df_all_RPM_TE_size, aes(x=size, y=percent, fill=compartment)) +
 
 ```{r}
 
+# F5-SC intersect
 df_F5_RPM_F5_SC_TE_per_family <- df_F5_RPM_F5_SC_TE %>% group_by(TE_family) %>% 
   summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') 
 
-df_F5_RPM_F5_SC_TE_per_family$TE_family <- factor(df_F5_RPM_F5_SC_TE_per_family$TE_family, 
-levels = df_F5_RPM_F5_SC_TE_per_family$TE_family[order(df_F5_RPM_F5_SC_TE_per_family$RPM, decreasing = TRUE)])
+factor_TE_family <- df_F5_RPM_F5_SC_TE_per_family$TE_family
 
-df_F5_RPM_TE_per_family <- df_F5_RPM_TE %>% group_by(TE_family) %>% summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') 
+df_F5_RPM_F5_SC_TE_per_family$TE_family <- factor(factor_TE_family, 
+  levels = factor_TE_family[order(df_F5_RPM_F5_SC_TE_per_family$RPM, decreasing = TRUE)])
 
-df_F5_RPM_TE_per_family$TE_family <- factor(df_F5_RPM_TE_per_family$TE_family, 
-levels = df_F5_RPM_TE_per_family$TE_family[order(df_F5_RPM_TE_per_family$RPM, decreasing = TRUE)])
 
+# F5
+df_F5_RPM_TE_per_family <- df_F5_RPM_TE %>% group_by(TE_family) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') 
+
+factor_TE_family <- df_F5_RPM_TE_per_family$TE_family
+
+df_F5_RPM_TE_per_family$TE_family <- factor(factor_TE_family, 
+levels = factor_TE_family[order(df_F5_RPM_TE_per_family$RPM, decreasing = TRUE)])
+
+# SC
 df_SC_RPM_TE_per_family <- df_SC_RPM_TE %>% group_by(TE_family) %>% 
   summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') 
 
-df_SC_RPM_TE_per_family$TE_family <- factor(df_SC_RPM_TE_per_family$TE_family, 
-                                            levels = df_SC_RPM_TE_per_family$TE_family[order(df_SC_RPM_TE_per_family$RPM, decreasing = TRUE)])
+factor_TE_family <- df_SC_RPM_TE_per_family$TE_family
 
+df_SC_RPM_TE_per_family$TE_family <- factor(factor_TE_family, 
+levels = factor_TE_family[order(df_SC_RPM_TE_per_family$RPM, decreasing = TRUE)])
 
+# Pollen
 df_pollen_RPM_TE_per_family <- df_pollen_RPM_TE %>% group_by(TE_family) %>% 
   summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') 
 
-df_pollen_RPM_TE_per_family$TE_family <- factor(df_pollen_RPM_TE_per_family$TE_family, 
-levels = df_pollen_RPM_TE_per_family$TE_family[order(df_pollen_RPM_TE_per_family$RPM, decreasing = TRUE)])
+factor_TE_family <- df_pollen_RPM_TE_per_family$TE_family
 
+df_pollen_RPM_TE_per_family$TE_family <- factor(factor_TE_family, 
+levels = factor_TE_family[order(factor_TE_family, decreasing = TRUE)])
+
+# Add compartment name
 df_F5_RPM_F5_SC_TE_per_family$compartment <- "F5-SC"
 df_F5_RPM_TE_per_family$compartment <- "F5"
 df_SC_RPM_TE_per_family$compartment <- "SC"
 df_pollen_RPM_TE_per_family$compartment <- "pollen"
 
+# Calulate percentage of RPM for each compartment
 df_F5_RPM_F5_SC_TE_per_family$percent <- df_F5_RPM_F5_SC_TE_per_family$RPM/sum(df_F5_RPM_F5_SC_TE_per_family$RPM)
-df_F5_RPM_TE_per_family$percent <- df_F5_RPM_TE_per_family$RPM/sum(df_F5_RPM_TE_per_family$RPM)
-df_SC_RPM_TE_per_family$percent <- df_SC_RPM_TE_per_family$RPM/sum(df_SC_RPM_TE_per_family$RPM)
-df_pollen_RPM_TE_per_family$percent <- df_pollen_RPM_TE_per_family$RPM/sum(df_pollen_RPM_TE_per_family$RPM)
 
+df_F5_RPM_TE_per_family$percent <- df_F5_RPM_TE_per_family$RPM/sum(df_F5_RPM_TE_per_family$RPM)
+
+df_SC_RPM_TE_per_family$percent <- df_SC_RPM_TE_per_family$RPM/sum(df_SC_RPM_TE_per_family$RPM)
+
+df_pollen_RPM_TE_per_family$percent <- 
+  df_pollen_RPM_TE_per_family$RPM/sum(df_pollen_RPM_TE_per_family$RPM)
+
+# Merge into one dataframe
 df_all_RPM_TE_per_family <- rbind(df_F5_RPM_F5_SC_TE_per_family, 
                                   df_F5_RPM_TE_per_family, df_SC_RPM_TE_per_family, 
                                   df_pollen_RPM_TE_per_family)
@@ -1189,7 +1285,6 @@ ggplot(df_all_RPM_TE_per_family, aes(x=TE_family, y=percent, fill=compartment)) 
   scale_fill_manual(values=c("#a6cee3", "#1f78b4", "#b2df8a","#33a02c"))
 
 ```
-
 
 ![](images/relative_expression_TE_per_TE_family.png)
 
@@ -1365,9 +1460,394 @@ ggarrange(g1,g2,g3,g4, nrow=2, ncol=2)
 
 # Degradome analysis
 
+The degradome library for B73 mature pollen sample was made as described in [Li et al., 2019](https://doi.org/10.1186/s13007-019-0524-7).
+
+## Pipeline for library preparation
+
+![](images/pipeline.png)
+
+Image modified from [Li et al., 2019](https://doi.org/10.1186/s13007-019-0524-7).
+
+
+## Degradome library structure
+
+![](images/library_structure.png)
+
+*Degradome library structure*
+
+Image made with the SnapGene software (www.snapgene.com).
+
+## Trimming
+
+Remove the 5' sequence matching the EcoP15I recognition site, then the 3' sequencing containing the 3' adaptor sequence, then remove all trimmed sequences that are not 27-nt in length.
+
+```{bash, eval=FALSE}
+# Trimming
+cutadapt -j 0 -g AGCAG --discard-untrimmed SRR28009042.fastq | \
+cutadapt -j 0 -a AGATCGGAAGAGCACAC --discard-untrimmed - | \
+cutadapt -j 0 -m 27 -M 27 -o SRR28009042.trimmed.fq -
+
+# Turn into fasta
+cutadapt -j 0 -o SRR28009042.fasta SRR28009042.trimmed.fq.gz &
+
+```
+
+30.68M reads retained after trimming.
+
+
+## Cleaveland analysis
+
+Clone Cleaveland repository from https://github.com/MikeAxtell/CleaveLand4 and install dependencies (see Clevaland documentation).
+
+List of the 20 miRNAs found in F5-SC intersect:
+
+```{r}
+# Create a fasta file with this list of 20 sequences
+# Remove space in miRNA vector
+df_F5_RPM_F5_SC_RPM_miRNA$miRNA <- gsub(" ","",df_F5_RPM_F5_SC_RPM_miRNA$miRNA)
+
+# Create unique IDs
+unique_ID <- paste(df_F5_RPM_F5_SC_RPM_miRNA$miRNA, seq(1:20),sep="_")
+
+# Create a fasta file with all miRNA sequences
+make_fasta(vector_sequence = df_F5_RPM_F5_SC_RPM_miRNA$sequence, 
+           path_output = "data/df_F5_RPM_F5_SC_RPM_miRNA.fa", sequence_names = unique_ID)
+
+```
+
+
+```{bash, eval=FALSE}
+
+# Get cDNA sequences from B73 NAM5
+wget https://download.maizegdb.org/Zm-B73-REFERENCE-NAM-5.0/Zm-B73-REFERENCE-NAM-5.0_Zm00001eb.1.cdna.fa.gz
+gunzip Zm-B73-REFERENCE-NAM-5.0_Zm00001eb.1.cdna.fa.gz
+
+# Run cleaveland
+CleaveLand4.pl -e SRR28009042.fasta -u df_F5_RPM_F5_SC_RPM_miRNA.fa \
+  -n Zm-B73-REFERENCE-NAM-5.0_Zm00001eb.1.cdna.fa \
+  -o output_cleaveland_dir -t > df_F5_RPM_F5_SC_RPM_miRNA_results.txt
+
+```
+
+
+```{r}
+
+# Get significant hits
+df_cleaveland_raw <- read.delim("data/df_F5_RPM_F5_SC_RPM_miRNA_results.txt", 
+                                header=TRUE, skip = 8)
+
+# Retrieve query sRNAs and target region from column "Sequence"
+df_cleaveland <- df_cleaveland_raw %>% 
+  separate(Sequence, c("target_seq", "query_seq"),sep = "&", remove=F)
+
+# Change Us to Ts
+df_cleaveland$target_seq <- gsub("U", "T", df_cleaveland$target_seq)
+df_cleaveland$query_seq <- gsub("U", "T", df_cleaveland$query_seq)
+
+# Remove hyphens from sequences (prevent querying afterwards)
+df_cleaveland$target_seq <- gsub("-", "", df_cleaveland$target_seq)
+df_cleaveland$query_seq <- gsub("-", "", df_cleaveland$query_seq)
+
+# Get unique geneID
+df_cleaveland <- df_cleaveland %>% 
+  separate(Transcript, c("geneID", "Tnum"),sep = "_", remove = F)
+
+saveRDS(df_cleaveland, "data/df_F5_RPM_F5_SC_RPM_miRNA_results.Rds")
+
+write_delim(df_cleaveland, "data/df_F5_RPM_F5_SC_RPM_miRNA_results_all.txt", delim="\t")
+
+df_cleaveland_cleaned <- df_cleaveland %>% filter(DegradomePval < 0.05) %>%
+  filter(DegradomeCategory %in% c("0","1","2"))
+
+# Save as R object
+write_delim(df_cleaveland_cleaned, "data/df_F5_RPM_F5_SC_RPM_miRNA_results_sig.txt", delim="\t")
+
+# Get list of genes
+cut -f1 df_F5_RPM_F5_SC_RPM_miRNA_results_sig.txt | \
+cut -d_ -f1 | sort | uniq | grep "Zm"
+Zm00001eb000690
+Zm00001eb031670
+Zm00001eb050660
+Zm00001eb057260
+Zm00001eb136060
+Zm00001eb169410
+Zm00001eb192810
+Zm00001eb213430
+Zm00001eb223610
+Zm00001eb322280
+Zm00001eb404260
+```
+
+11 genes found as target for the sRNAs annotated as 20 miRNAs from the F5-SC intersect.
+
+Zm00001eb000690
+Zm00001eb031670
+Zm00001eb050660
+Zm00001eb057260
+Zm00001eb136060
+Zm00001eb169410
+Zm00001eb192810
+Zm00001eb213430
+Zm00001eb223610
+Zm00001eb322280
+Zm00001eb404260
 
 
 
 # Sperm cell DNA methylation analysis
+
+There are 3 replicates for sperm cell tissue (70SC, 84SC, 87SC). The prefix number indicates the number of sperm cells isolated by Stefan. The libraries were made according to a single-cell post-bisulfite adapter treatment scBS-seq ([Smallwood et al., 2014](https://www.nature.com/articles/nmeth.3035)). Sequencing in PE 100+100 mode. The first 9 bp 5' of the reads should be clipped. The 3' end contains Illumina Universal Adapter (AGATCGGAAGAG based on https://github.com/golharam/FastQC/blob/master/Configuration/adapter_list.txt).
+
+The method is based on post-bisulfite adaptor tagging. This method generates many chimeric read pairs so that it is advised to map the read1 and 2 separately (as if single end) (https://sequencing.qcfail.com/articles/pbat-libraries-may-generate-chimaeric-read-pairs/). See also [Wu et al 2019](https://pubmed.ncbi.nlm.nih.gov/30859188/).
+
+Read processing as described in Smallwood 2014:
+
+> Sequencing data processing and data analysis. Raw sequence reads were trimmed to remove the first 9 base pairs, adaptor contamination and poor-quality reads using Trim Galore! (v0.3.5, http:// www.bioinformatics.babraham.ac.uk/projects/trim_galore /, parameters:–clip_r1 9–clip_r2 9 –paired). Owing to the multiple rounds of random priming performed with oligo 1, scBS-seq libraries are nondirectional. Trimmed sequences were first mapped to the human genome (build GRCh37) using Bismark21 (v0.10.1; parameters:–pe,–bowtie2,–non_directional,–unmapped), resulting in 1.4% mapping efficiency (0.2–13.2% range). Remaining sequences were mapped to the mouse genome (build NCBI37) in single-end mode (Bismark parameters:–bowtie2non_directional). Methylation calls were extracted after duplicate sequences had been excluded. For oocyte bulk analysis, our MII bulk data set was merged in silico with previously published data sets8 (DNA Data Bank of Japan, GenBank and European Molecular Biology Laboratory accession number DRA000570). Data visualization and analysis were performed using SeqMonk, custom R and Java scripts. For Figure 1c, C+G methylation was calculated as the average of methylation for each CpG position, and non-CpG methylation was extracted from the Bismark reports. Trend line in Figure 1b was calculated using polynomial regression. Percentage of concordance was calculated as the percentage of CpGs presenting the same methylation call at the same genomic position across two cells. For correlation analysis (Pearson’s), 2-kb windows were defined informative if at least 8 CpGs per window were sequenced. CGI annotation used is from CXXC affinity purification plus deep sequencing (CAP-seq) experiments22. Informative CGIs were defined if at least 10 CpGs per CGI were sequenced. Hyper-methylated and hypo-methylated CGIs were defined as ≥80% and ≤20% methylation respectively. Annotation for comparison of genomic contexts (Fig. 2d, Supplementary Fig. 12, and Supplementary Table 2) were extracted from previously published datasets15,23.
+
+## Trimming
+
+Note on adaptor trimming in trimgalore https://github.com/FelixKrueger/TrimGalore/blob/master/Docs/Trim_Galore_User_Guide.md
+
+> The auto-detection behaviour can be overruled by specifying an adapter sequence manually or by using --illumina, --nextera or --small_rna. Please note: the first 13 bp of the standard Illumina paired-end adapters (AGATCGGAAGAGC) recognise and removes adapter from most standard libraries, including the Illumina TruSeq and Sanger iTag adapters. This sequence is present on both sides of paired-end sequences, and is present in all adapters before the unique Index sequence occurs. So for any 'normal' kind of sequencing you do not need to specify anything but --illumina, or better yet just use the auto-detection.
+
+Manual https://github.com/FelixKrueger/TrimGalore/blob/master/Docs/Trim_Galore_User_Guide.md
+
+```{bash, eval=FALSE}
+
+# Install Trim Galore
+curl -fsSL https://github.com/FelixKrueger/TrimGalore/archive/0.6.10.tar.gz \
+  -o trim_galore.tar.gz
+  
+tar xvzf trim_galore.tar.gz
+# Run Trim Galore
+
+# Load trim_galore dependency
+module load cutadapt/4.4
+
+~/bin/TrimGalore-0.6.10/trim_galore --cores 4 --clip_R1 9 --clip_R2 9 \
+--paired 70SC_1.fastq.gz 70SC_2.fastq.gz -o trimgalore_output 
+
+~/bin/TrimGalore-0.6.10/trim_galore --cores 4 --clip_R1 9 --clip_R2 9 \
+--paired 84SC_1.fastq.gz 84SC_2.fastq.gz -o trimgalore_output
+
+~/bin/TrimGalore-0.6.10/trim_galore --cores 4 --clip_R1 9 --clip_R2 9 \
+--paired 87SC_1.fastq.gz 87SC_2.fastq.gz -o trimgalore_output
+
+```
+
+Strong bias at the last nucleotide: No A present. This is probably due to hard trimming (first base of the adapter starts by a A). Krueger recommends hard trimming for BS-seq data due to the the 3-letter alphabet which makes residual adapter sequences more likely to get false call:
+
+>This kind of aggressive trimming may be preferred where small amounts of adapter could have a deleterious effect on downstream analysis, such as for SNP detection or for detection of methylation in bisulphite sequencing. (https://sequencing.qcfail.com/articles/read-through-adapters-can-appear-at-the-ends-of-sequencing-reads/)
+
+
+## Pool fastq files
+
+Since we don't need to compare different tissue type and to increase coverage per cytosine, we can pool all reads in one file. We also don't need to separate read1 and read2 as we would map them separately anyway. We just need to use the non_directional option of Bismark so that it maps each read to both strands.
+
+```{bash, eval=FALSE}
+cat *fq.gz > pooled_SC.fq.gz &
+```
+
+
+## Build Bismark index
+
+```{bash, eval=FALSE}
+# Download Bismark
+wget https://github.com/FelixKrueger/Bismark/archive/refs/tags/v0.24.2.tar.gz
+
+tar xzf v0.24.2.tar.gz
+
+# Add to .bashrc
+export PATH="${PATH}:/usr/users/zicola/bin/Bismark-0.24.2"
+
+# Get B73 NAM5 genome (chromosomes and contigs)
+wget https://download.maizegdb.org/Zm-B73-REFERENCE-NAM-5.0/Zm-B73-REFERENCE-NAM-5.0.fa.gz
+gunzip Zm-B73-REFERENCE-NAM-5.0.fa.gz
+
+# Make genome bismark index
+bismark_genome_preparation --bowtie2 /path/to/fasta
+
+```
+
+
+## Mapping
+
+```{bash, eval=FALSE}
+index="/path/to/bismark_index"
+bismark -p 6 -q --bowtie2 --non_directional -o output_bismark $index pooled_SC.fq.gz
+```
+
+
+```
+Final Alignment report
+======================
+Sequences analysed in total:	1059773564
+Number of alignments with a unique best hit from the different alignments:	138259011
+Mapping efficiency:	13.0%
+
+Sequences with no alignments under any condition:	734667766
+Sequences did not map uniquely:	186846787
+Sequences which were discarded because genomic sequence could not be extracted:	80
+
+Number of sequences with unique best (first) alignment came from the bowtie output:
+CT/CT:	133673872	((converted) top strand)
+CT/GA:	1501253	((converted) bottom strand)
+GA/CT:	2580495	(complementary to (converted) top strand)
+GA/GA:	503311	(complementary to (converted) bottom strand)
+
+Final Cytosine Methylation Report
+=================================
+Total number of C's analysed:	2884164512
+
+Total methylated C's in CpG context:	395702696
+Total methylated C's in CHG context:	324693323
+Total methylated C's in CHH context:	120269439
+Total methylated C's in Unknown context:	125594
+
+Total unmethylated C's in CpG context:	160721086
+Total unmethylated C's in CHG context:	166917618
+Total unmethylated C's in CHH context:	1715860350
+Total unmethylated C's in Unknown context:	542854
+
+C methylated in CpG context:	71.1%
+C methylated in CHG context:	66.0%
+C methylated in CHH context:	6.6%
+C methylated in Unknown context (CN or CHN):	18.8%
+
+
+Bismark completed in 1d 10h 21m 14s
+
+```
+
+
+## Remove duplicates
+
+```{bash, eval=FALSE}
+deduplicate_bismark --single --bam --output_dir output_bismark/ \
+  output_bismark/pooled_SC_bismark_bt2.bam
+```
+
+
+```
+Total number of alignments analysed in pooled_SC_bismark_bt2.bam:	138258931
+Total number duplicated alignments removed:	64417770 (46.59%)
+Duplicated alignments were found at:	31883091 different position(s)
+
+Total count of deduplicated leftover sequences: 73841161 (53.41% of total)
+```
+
+
+Total count of deduplicated leftover sequences: 76000221 (53.57% of total)
+About 50% of the data removed.
+
+
+
+
+## Methylation extractor
+
+```{bash, eval=FALSE}
+bismark_methylation_extractor --buffer_size 20G -o output_bismark \
+--single-end --gzip --comprehensive --CX --bedGraph \
+--counts output_bismark/pooled_SC_bismark_bt2.deduplicated.bam
+```
+
+## Coverage file
+
+```{bash, eval=FALSE}
+
+name_file_result="pooled_SC"
+path_output="output_bismark"
+
+for context in {CpG,CHG,CHH}; do
+    result_file="${path_output}/${context}_context_${name_file_result}_bismark_bt2.deduplicated.txt.gz"
+    file_cov="${context}_context_${name_file_result}.bismark.cov.gz"
+    if [ -e $result_file ] && [ ! -e $path_output/$file_cov ]; then
+        bismark2bedGraph -o ${context}_context_${name_file_result}.bedGraph \
+          --dir $path_output --CX --counts $result_file
+    elif [ -e $path_output/$file_cov ]; then
+        echo "bismark2bedGraph already generated $path_output/$file_cov"
+        echo -e "Skip bismark2bedGraph \n" 
+    fi
+done
+
+```
+
+
+## Cytosine report
+
+Note that for the command `coverage2cytosine`, the location of the input file should be given as absolute path. The variable $path_output should therefore be an absolute path. The variable `\$path_fasta` should also be an absolute path (mentioned in coverage2cytosine help menu).
+
+```{bash, eval=FALSE}
+CX_file_cov="pooled_SC_bismark_bt2.deduplicated.bismark.cov.gz"
+index="/path/to/bismark_index"
+coverage2cytosine -o pooled_SC --dir output_bismark --CX \
+--genome_folder $index output_bismark/$CX_file_cov
+```
+
+Output file `pooled_SC.CX_report.txt` is generated.
+
+```{bash, eval=FALSE}
+# Keep positions with at least 5 read coverage
+awk '{ if ($4+$5>4) print $0 }' pooled_SC.CX_report.txt > pooled_SC.CX_report.filtered.txt
+
+# File shrunk from 27Gb to 3.1Gb 
+
+# Sort file
+sort -k1,1n -k2,2n pooled_SC.CX_report.filtered.txt > pooled_SC.CX_report.filtered.sorted.txt
+
+# I need to remove one to position and create a second column 
+# with report position (end position) and add the methylation score as 4th column
+awk 'BEGIN { OFS="\t" } { print $1, $2-1, $2, $4/($4+$5)}' \
+pooled_SC.CX_report.filtered.sorted.txt > pooled_SC.CX_report.filtered.sorted.bedGraph 
+```
+
+
+## Methylation at F5-SC overlapping canonical (20-24nt) sRNAs
+
+```{r}
+
+# Get sequence of intersect (22408 sRNAs)
+df_F5_RPM_F5_SC <- readRDS("data/df_SC_RPM_intersect.Rds")
+
+# 7606 out of 22408 sRNAs are 20-24
+sRNA_F5_SC_bool <- nchar(df_F5_RPM_F5_SC$sequence)>19 & nchar(df_F5_RPM_F5_SC$sequence)<25
+
+df_F5_RPM_F5_SC_20_24nt <- df_F5_RPM_F5_SC[sRNA_F5_SC_bool,]
+
+make_fasta(df_F5_RPM_F5_SC_20_24nt$sequence, "data/df_F5_RPM_F5_SC_20_24nt.fa")
+
+```
+
+
+7606 20-24nt mapped sRNAs retrieved. 
+
+Map these sRNAs (to get coordinates) and convert the bam into bed
+
+```{bash, eval=FALSE}
+
+bowtie -p 4 -S -l 24 -n 0 -x $index --threads 8 -f data/df_F5_RPM_F5_SC_20_24nt.fa | \
+samtools sort | samtools view -S -o F5_RPM_F5_SC_20_24nt.sam -
+
+# reads processed: 7606
+# reads with at least one alignment: 7606 (100.00%)
+# reads that failed to align: 0 (0.00%)
+
+# Convert sam to bed
+sam2bed < F5_RPM_F5_SC_20_24nt.sam > F5_RPM_F5_SC_20_24nt.bed
+
+# Get bedgraph
+bedtools map -a F5_RPM_F5_SC_20_24nt.bed -b pooled_SC.CX_report.filtered.sorted.bedGraph \
+-c 4 -o mean | awk '{ if($18 != ".") {print $0} }' - | \
+  awk 'BEGIN {OFS="\t"} {print $1, $2, $3, $18}' - > F5_SC_20_24nt.meth.bed
+
+wc -l F5_SC_20_24nt.meth.bed
+1874 F5_SC_20_24nt.meth.bed
+
+awk '{ sum += $4; n++ } END { if (n > 0) print sum / n; }' F5_SC_20_24nt.meth.bed
+0.255322
+```
+
+Out of 7606 sRNAs, I end up with 1874 that have DNA methylation data. The average methylation at sRNA mapping site is 25.5%.
+
 
 
