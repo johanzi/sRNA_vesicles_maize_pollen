@@ -1,7 +1,7 @@
 Argonaute-containing Vesicles Shuttle Small RNAs in Zea mays pollen
 ================
 Johan Zicola
-2024-11-05 12:25:45
+2024-11-05 12:33:58
 
 - [Software dependencies](#software-dependencies)
 - [R libraries](#r-libraries)
@@ -911,7 +911,8 @@ df_F5_RPM_tRF_per_type <- df_F5_RPM_tRF %>% group_by(tRNA) %>%
 
 # Reorganize tRNA by decreasing RPM_sum
 df_F5_RPM_tRF_per_type$tRNA <- 
-  factor(df_F5_RPM_tRF_per_type$tRNA, levels=df_F5_RPM_tRF_per_type$tRNA[order(df_F5_RPM_tRF_per_type$RPM, decreasing = TRUE)])
+  factor(df_F5_RPM_tRF_per_type$tRNA, 
+         levels=df_F5_RPM_tRF_per_type$tRNA[order(df_F5_RPM_tRF_per_type$RPM, decreasing = TRUE)])
 
 df_F5_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% 
   ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
@@ -972,7 +973,8 @@ df_pollen_RPM_tRF_per_type <- df_pollen_RPM_tRF %>% group_by(tRNA) %>%
 df_pollen_RPM_tRF_per_type$tRNA <- factor(df_pollen_RPM_tRF_per_type$tRNA,
  levels=df_pollen_RPM_tRF_per_type$tRNA[order(df_pollen_RPM_tRF_per_type$RPM, decreasing = TRUE)])
 
-df_pollen_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
+df_pollen_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% 
+  ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
   geom_bar(stat="identity", fill="grey") + 
   theme_bw() + 
   ylab("RPM") + 
@@ -1118,7 +1120,8 @@ samtools view -F4 -b -o all_sRNAs_18_37nt_TEs.bam -
 # reads that failed to align: 485176 (86.34%)
 
 # Make a fasta file
-samtools view -b all_sRNAs_18_37nt_TEs.bam | samtools bam2fq | fastq_to_fasta -i - -o all_sRNAs_18_37nt_TEs.fa
+samtools view -b all_sRNAs_18_37nt_TEs.bam | samtools bam2fq | \
+fastq_to_fasta -i - -o all_sRNAs_18_37nt_TEs.fa
 
 # Create a dictionary (seq name and TE name
 samtools view all_sRNAs_18_37nt_TEs.bam | cut -f1,3 > seq_2_TE.txt
@@ -1141,24 +1144,20 @@ df_TEs_annotated <- merge.data.frame(df_TEs, seq_2_TE_family, by="id")
 ``` r
 # F5-SC intersect in F5
 df_F5_RPM_F5_SC <- readRDS("data/df_F5_RPM_intersect.Rds")
-
 df_F5_RPM_F5_SC_TE <- merge.data.frame(df_TEs_annotated, df_F5_RPM_F5_SC, by="sequence")
 # 594
 
 # F5
 df_F5_RPM <- readRDS("data/df_F5_RPM.Rds")
-
 df_F5_RPM_TE <- merge.data.frame(df_TEs_annotated, df_F5_RPM, by="sequence")
 
 # SC
 df_SC_RPM <- readRDS("data/df_SC_RPM.Rds")
-
 df_SC_RPM_TE <- merge.data.frame(df_TEs_annotated, df_SC_RPM, by="sequence")
 # 5130
 
 # Pollen
 df_pollen_RPM <- readRDS("data/df_pollen_RPM.Rds")
-
 df_pollen_RPM_TE <- merge.data.frame(df_TEs_annotated, df_pollen_RPM, by="sequence")
 # 63851
 ```
@@ -1264,11 +1263,14 @@ df_SC_RPM_TE_per_family$compartment <- "SC"
 df_pollen_RPM_TE_per_family$compartment <- "pollen"
 
 # Calulate percentage of RPM for each compartment
-df_F5_RPM_F5_SC_TE_per_family$percent <- df_F5_RPM_F5_SC_TE_per_family$RPM/sum(df_F5_RPM_F5_SC_TE_per_family$RPM)
+df_F5_RPM_F5_SC_TE_per_family$percent <- 
+  df_F5_RPM_F5_SC_TE_per_family$RPM/sum(df_F5_RPM_F5_SC_TE_per_family$RPM)
 
-df_F5_RPM_TE_per_family$percent <- df_F5_RPM_TE_per_family$RPM/sum(df_F5_RPM_TE_per_family$RPM)
+df_F5_RPM_TE_per_family$percent <- 
+  df_F5_RPM_TE_per_family$RPM/sum(df_F5_RPM_TE_per_family$RPM)
 
-df_SC_RPM_TE_per_family$percent <- df_SC_RPM_TE_per_family$RPM/sum(df_SC_RPM_TE_per_family$RPM)
+df_SC_RPM_TE_per_family$percent <- 
+  df_SC_RPM_TE_per_family$RPM/sum(df_SC_RPM_TE_per_family$RPM)
 
 df_pollen_RPM_TE_per_family$percent <- 
   df_pollen_RPM_TE_per_family$RPM/sum(df_pollen_RPM_TE_per_family$RPM)
@@ -1314,7 +1316,8 @@ unitas.miR-table_Zea_mays.id_seq_family.all.txt
 ```
 
 ``` r
-df_unitas_miRNA_annotation <- read.delim("data/unitas/unitas.miR-table_Zea_mays.id_seq_family.all.txt")
+df_unitas_miRNA_annotation <- 
+  read.delim("data/unitas/unitas.miR-table_Zea_mays.id_seq_family.all.txt")
 
 colnames(df_unitas_miRNA_annotation) <- c("miRNA","sequence","family")
 df_unitas_miRNA_annotation$family <- as.factor(df_unitas_miRNA_annotation$family)
@@ -1325,13 +1328,11 @@ df_unitas_miRNA_annotation <- df_unitas_miRNA_annotation %>% filter(!grepl("\\("
 df_SC_RPM_miRNA <- merge.data.frame(df_SC_RPM, df_unitas_miRNA_annotation, by="sequence")
 df_pollen_RPM_miRNA <- merge.data.frame(df_pollen_RPM, df_unitas_miRNA_annotation, by="sequence")
 df_F5_RPM_miRNA <- merge.data.frame(df_F5_RPM, df_unitas_miRNA_annotation, by="sequence")
-df_F5_RPM_F5_SC_RPM_miRNA <- merge.data.frame(df_F5_RPM_F5_SC, df_unitas_miRNA_annotation, by="sequence")
+df_F5_RPM_F5_SC_RPM_miRNA <- 
+  merge.data.frame(df_F5_RPM_F5_SC, df_unitas_miRNA_annotation, by="sequence")
 
 list_miRNA_df <- list(pollen=df_pollen_RPM_miRNA, SC=df_SC_RPM_miRNA, 
                       F5=df_F5_RPM_miRNA, F5_SC=df_F5_RPM_F5_SC_RPM_miRNA)
-
-# Export df_F5_RPM_F5_SC_RPM_miRNA
-#write_delim(df_F5_RPM_F5_SC_RPM_miRNA, "data/df_F5_RPM_F5_SC_RPM_miRNA.txt")
 ```
 
 ### Expression of F5-SC sRNAs across tissues
@@ -1347,7 +1348,6 @@ df_pollen_RPM_miRNA_family <- summary_df(list_miRNA_df[[1]],"pollen")
 df_SC_RPM_miRNA_family <- summary_df(list_miRNA_df[[2]],"SC")
 df_F5_RPM_miRNA_family <- summary_df(list_miRNA_df[[3]],"F5")
 df_F5_RPM_F5_SC_RPM_miRNA_family <- summary_df(list_miRNA_df[[4]],"F5_SC")
-
 
 df_all_miRNA <- rbind(df_pollen_RPM_miRNA_family, df_SC_RPM_miRNA_family, 
                       df_F5_RPM_miRNA_family, df_F5_RPM_F5_SC_RPM_miRNA_family)
@@ -1365,10 +1365,12 @@ df_SC_RPM_miRNA_seq <- summary_df_seq(list_miRNA_df[[2]],"SC")
 df_F5_RPM_miRNA_seq <- summary_df_seq(list_miRNA_df[[3]],"F5")
 df_F5_RPM_F5_SC_RPM_miRNA_seq <- summary_df_seq(list_miRNA_df[[4]],"F5_SC")
 
-df_all_miRNA_seq <- rbind(df_pollen_RPM_miRNA_seq, df_SC_RPM_miRNA_seq, df_F5_RPM_miRNA_seq)
+df_all_miRNA_seq <- rbind(df_pollen_RPM_miRNA_seq, 
+                          df_SC_RPM_miRNA_seq, df_F5_RPM_miRNA_seq)
 
 # Order compartments
-df_all_miRNA$compartment <- factor(df_all_miRNA$compartment, levels = c("pollen", "SC", "F5", "F5_SC"))
+df_all_miRNA$compartment <- factor(df_all_miRNA$compartment, 
+                                   levels = c("pollen", "SC", "F5", "F5_SC"))
 
 # Sort by alphnumerical orders the miRNAs
 sorted_family <- gtools::mixedsort(as.character(unique(df_all_miRNA$family)))
@@ -1932,7 +1934,8 @@ samtools sort | samtools view -S -o F5_SC_20_24nt_mapping_concatenated_TEs.sam -
 # reads that failed to align: 7031 (92.44%)
 
 # Convert sam to bed
-sam2bed < F5_SC_20_24nt_mapping_concatenated_TEs.sam > F5_SC_20_24nt_mapping_concatenated_TEs.bed
+sam2bed < F5_SC_20_24nt_mapping_concatenated_TEs.sam > \
+F5_SC_20_24nt_mapping_concatenated_TEs.bed
 
 # Generate bismark indexes for concatenated_TEs.fa
 bismark_genome_preparation --bowtie2 /path/to/concatenated_TEs_fasta
@@ -1955,14 +1958,17 @@ coverage2cytosine -o pooled_SC_TEs --dir output_bismark_TEs \
 output_bismark_TEs/pooled_SC_bismark_bt2.deduplicated.bismark.cov.gz
  
 # Keep positions with at least 5 read coverage
-awk '{ if ($4+$5>4) print $0 }' pooled_SC_TEs.CX_report.txt > pooled_SC_TEs.CX_report.filtered.txt
+awk '{ if ($4+$5>4) print $0 }' pooled_SC_TEs.CX_report.txt > \
+pooled_SC_TEs.CX_report.filtered.txt
 
 # Sort file
-sort -k1,1 -k2,2n pooled_SC_TEs.CX_report.filtered.txt > pooled_SC_TEs.CX_report.filtered.sorted.txt
+sort -k1,1 -k2,2n pooled_SC_TEs.CX_report.filtered.txt > \
+pooled_SC_TEs.CX_report.filtered.sorted.txt
 
 # Create a bedGraph file
 awk 'BEGIN { OFS="\t" } { print $1, $2-1, $2, $4/($4+$5)}' \
-pooled_SC_TEs.CX_report.filtered.sorted.txt > pooled_SC_TEs.CX_report.filtered.sorted.bedGraph
+pooled_SC_TEs.CX_report.filtered.sorted.txt > \
+pooled_SC_TEs.CX_report.filtered.sorted.bedGraph
 
 wc -l pooled_SC_TEs.CX_report.filtered.sorted.bedGraph
 892663 pooled_SC_TEs.CX_report.filtered.sorted.bedGraph
@@ -1986,9 +1992,10 @@ wc -l pooled_SC_TEs.CX_report.filtered.sorted.bedGraph
 
 ``` bash
 # Cleanup
-awk 'BEGIN {OFS="\t"} {print $1, $2, $3}' F5_SC_20_24nt_mapping_concatenated_TEs.bed > F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.bed
+awk 'BEGIN {OFS="\t"} {print $1, $2, $3}' F5_SC_20_24nt_mapping_concatenated_TEs.bed > \
+F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.bed
 
-bedGraph="/media/zicola/lab2/BSseq_SC/output_bismark_TEs/pooled_SC_TEs.CX_report.filtered.sorted.bedGraph"
+bedGraph="pooled_SC_TEs.CX_report.filtered.sorted.bedGraph"
 
 # How many sRNAs have methylation data
 bedtools map -a F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.bed \
@@ -2025,7 +2032,8 @@ observed for the sRNAs could be observed by chance compared to a random
 distribution.
 
 ``` bash
-# Concatenate 3x the sRNAs to have enough sRNAs with DNA methylation value for the permutation
+# Concatenate 3x the sRNAs to have enough sRNAs with 
+# DNA methylation value for the permutation
 cat F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed \
 F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed \
 F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed \
@@ -2074,8 +2082,10 @@ permutation_concatenated_TEs/average_meth_permutation.txt
 ```
 
 ``` r
-permutation_DNA_methylation <- as.vector(unlist(read.delim("data/average_meth_permutation.txt",
-                                                           header = F, dec=",")))
+permutation_DNA_methylation <- 
+  as.vector(unlist(read.delim("data/average_meth_permutation.txt",
+                                                header = F, dec=",")))
+
 observed_value <- as.double("0.325267")
 
 df_DNA_meth_permutation <- as.data.frame(matrix(nrow=101, ncol=1))
