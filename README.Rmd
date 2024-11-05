@@ -1,5 +1,5 @@
 ---
-title: "Maize pollen paper"
+title: "Argonaute-containing Vesicles Shuttle Small RNAs in Zea mays pollen"
 author: "Johan Zicola"
 date: "`r format(Sys.time())`"
 output:
@@ -16,6 +16,9 @@ documentclass: article
 classoption: a4paper
 geometry: margin=1in
 ---
+
+Scripts related to the paper "RNA on the Move: Argonaute-containing Vesicles Shuttle Small RNAs in Zea mays pollen".
+
 
 ```{r, echo=FALSE}
 knitr::opts_chunk$set(eval = FALSE)
@@ -35,7 +38,7 @@ knitr::opts_chunk$set(eval = FALSE)
 * UNITAS (v1.8.0)
 * samtools (v1.9)
 * trim_galore (v.0.6.10) 
-* R (v4.3.2)
+* R (v4.0.3)
 * seqkit (v2.5.1)
 
 
@@ -2257,7 +2260,7 @@ ggplot(df_DNA_meth_permutation, aes(x="",y=value*100)) +
 
 ## Notes
 
-I did not upload on GitHub all files mentioned in this script due to the size limit available. However, all these files can be generated when starting from the raw fastq files available on NCBI and the maize annotations files available on [maizeGDB](https://www.maizegdb.org/).
+I did not upload all files mentioned in this script on GitHub due to the space restrictions. However, all these files can be generated starting from the raw fastq files available on NCBI and the maize annotations files available on [maizeGDB](https://www.maizegdb.org/).
 
 ## Authors
 
@@ -2265,5 +2268,5 @@ I did not upload on GitHub all files mentioned in this script due to the size li
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
