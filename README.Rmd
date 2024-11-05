@@ -919,7 +919,8 @@ df_SC_RPM_tRF_per_type <- df_SC_RPM_tRF %>% group_by(tRNA) %>%
 
 # Reorganize tRNA by decreasing RPM_sum
 df_SC_RPM_tRF_per_type$tRNA <- 
-  factor(df_SC_RPM_tRF_per_type$tRNA, levels=df_SC_RPM_tRF_per_type$tRNA[order(df_SC_RPM_tRF_per_type$RPM, decreasing = TRUE)])
+  factor(df_SC_RPM_tRF_per_type$tRNA, 
+  levels=df_SC_RPM_tRF_per_type$tRNA[order(df_SC_RPM_tRF_per_type$RPM, decreasing = TRUE)])
 
 df_SC_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% 
   ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
@@ -948,7 +949,8 @@ df_pollen_RPM_tRF_per_type <- df_pollen_RPM_tRF %>% group_by(tRNA) %>%
   summarize(RPM=sum(RPM)) %>% arrange(RPM)
 
 # Reorganize tRNA by decreasing RPM_sum
-df_pollen_RPM_tRF_per_type$tRNA <- factor(df_pollen_RPM_tRF_per_type$tRNA, levels=df_pollen_RPM_tRF_per_type$tRNA[order(df_pollen_RPM_tRF_per_type$RPM, decreasing = TRUE)])
+df_pollen_RPM_tRF_per_type$tRNA <- factor(df_pollen_RPM_tRF_per_type$tRNA,
+ levels=df_pollen_RPM_tRF_per_type$tRNA[order(df_pollen_RPM_tRF_per_type$RPM, decreasing = TRUE)])
 
 df_pollen_RPM_tRF_per_type %>% arrange(desc(RPM)) %>% head(10) %>% ggplot(aes(x=tRNA, y=RPM, fill=tRNA)) +
   geom_bar(stat="identity", fill="grey") + 
@@ -1080,15 +1082,23 @@ ggplot(df_F5_RPM_F5_SC_tRF_rRF_size, aes(x=size, y=RPM, fill=category)) +
 
 ### Mapping
 
-Use the maizeTE02052020 file used in UNITAS.
+Use the maizeTE02052020 fasta file used in UNITAS.
 
 ```{bash, eval=FALSE}
 
-module load fastx bowtie samtools 
+module load fastx bowtie samtools
 
-index="/usr/users/zicola/genomes/maize_B73/B73_NAM5/TE_NAM5_annotations/TE_bowtie1_index/maizeTE02052020"
+# Download B73 NAM5 TE annotation
+wget https://raw.githubusercontent.com/oushujun/MTEC/master/maizeTE02052020
 
-srun --time=00:05:00 -c 16 --mem=20Gb bowtie -S -n 0 -l 37 $index \
+# I just need to add the prefix "TE|" so that Unitas 
+# classifies the mapped sRNAs in the TE category
+seqkit replace -p ^ -r "TE|" maizeTE02052020.fa > maizeTE02052020_renamed.fa
+
+# Create bowtie indexes
+bowtie-build -f maizeTE02052020_renamed.fa maizeTE02052020
+
+srun --time=00:05:00 -c 16 --mem=20Gb bowtie -S -n 0 -l 37 maizeTE02052020 \
 --threads 16 -f all_sRNAs_18_37nt.fa | samtools sort | \
 samtools view -F4 -b -o all_sRNAs_18_37nt_TEs.bam -
 
@@ -1297,9 +1307,11 @@ cd data/unitas/
 
 cut -f1,2 unitas.miR-table_Zea_mays.txt > unitas.miR-table_Zea_mays.id_seq.txt
 
-cut -f1 unitas.miR-table_Zea_mays.id_seq.txt | cut -d- -f1 | sed 's/[a-z]$//g' > unitas.miR-table_Zea_mays.id_seq_family.txt
+cut -f1 unitas.miR-table_Zea_mays.id_seq.txt | cut -d- -f1 | \
+sed 's/[a-z]$//g' > unitas.miR-table_Zea_mays.id_seq_family.txt
 
-paste unitas.miR-table_Zea_mays.id_seq.txt unitas.miR-table_Zea_mays.id_seq_family.txt > unitas.miR-table_Zea_mays.id_seq_family.all.txt
+paste unitas.miR-table_Zea_mays.id_seq.txt unitas.miR-table_Zea_mays.id_seq_family.txt > \
+unitas.miR-table_Zea_mays.id_seq_family.all.txt
 
 ```
 
@@ -1318,7 +1330,8 @@ df_pollen_RPM_miRNA <- merge.data.frame(df_pollen_RPM, df_unitas_miRNA_annotatio
 df_F5_RPM_miRNA <- merge.data.frame(df_F5_RPM, df_unitas_miRNA_annotation, by="sequence")
 df_F5_RPM_F5_SC_RPM_miRNA <- merge.data.frame(df_F5_RPM_F5_SC, df_unitas_miRNA_annotation, by="sequence")
 
-list_miRNA_df <- list(pollen=df_pollen_RPM_miRNA, SC=df_SC_RPM_miRNA, F5=df_F5_RPM_miRNA, F5_SC=df_F5_RPM_F5_SC_RPM_miRNA)
+list_miRNA_df <- list(pollen=df_pollen_RPM_miRNA, SC=df_SC_RPM_miRNA, 
+                      F5=df_F5_RPM_miRNA, F5_SC=df_F5_RPM_F5_SC_RPM_miRNA)
 
 # Export df_F5_RPM_F5_SC_RPM_miRNA
 #write_delim(df_F5_RPM_F5_SC_RPM_miRNA, "data/df_F5_RPM_F5_SC_RPM_miRNA.txt")
@@ -1360,7 +1373,6 @@ df_F5_RPM_F5_SC_RPM_miRNA_seq <- summary_df_seq(list_miRNA_df[[4]],"F5_SC")
 
 df_all_miRNA_seq <- rbind(df_pollen_RPM_miRNA_seq, df_SC_RPM_miRNA_seq, df_F5_RPM_miRNA_seq)
 
-
 # Order compartments
 df_all_miRNA$compartment <- factor(df_all_miRNA$compartment, levels = c("pollen", "SC", "F5", "F5_SC"))
 
@@ -1398,15 +1410,18 @@ ggplot(df_all_miRNA, aes(x=family, y=RPM, fill=compartment)) +
 df_F5_SC_miRNA_seq <- df_all_miRNA_seq %>% filter(sequence %in% df_F5_RPM_F5_SC_RPM_miRNA$sequence)
 
 # Summarize by family
-df_F5_SC_RPM_miRNA_family <- df_F5_SC_miRNA_seq %>% group_by(family, compartment) %>% summarize(RPM=sum(RPM))
+df_F5_SC_RPM_miRNA_family <- df_F5_SC_miRNA_seq %>% 
+  group_by(family, compartment) %>% summarize(RPM=sum(RPM))
 
 # Discard miR2118 because it is a prediction with mismatch
 df_F5_SC_RPM_miRNA_family <-df_F5_SC_RPM_miRNA_family %>% filter(family!="miR2118")
 
 # Sort miRNA
-df_F5_SC_RPM_miRNA_family$family <- factor(df_F5_SC_RPM_miRNA_family$family, levels =c("miR156", "miR159", "miR166", "miR168", "miR396","miR444"))
+df_F5_SC_RPM_miRNA_family$family <- factor(df_F5_SC_RPM_miRNA_family$family, 
+        levels =c("miR156", "miR159", "miR166", "miR168", "miR396","miR444"))
 
-df_F5_SC_RPM_miRNA_family$compartment <- factor(df_F5_SC_RPM_miRNA_family$compartment, levels =c("pollen", "SC", "F5"))
+df_F5_SC_RPM_miRNA_family$compartment <- factor(df_F5_SC_RPM_miRNA_family$compartment, 
+                                                levels =c("pollen", "SC", "F5"))
 
 ggplot(df_F5_SC_RPM_miRNA_family, aes(x=family, y=RPM, fill=compartment)) + 
   geom_bar(stat="identity", position="dodge2")+
@@ -1660,7 +1675,7 @@ tar xzf v0.24.2.tar.gz
 # Add to .bashrc
 export PATH="${PATH}:/usr/users/zicola/bin/Bismark-0.24.2"
 
-# Get B73 NAM5 genome (chromosomes and contigs)
+# Get B73 NAM5 genome (chromosomes and scaffolds)
 wget https://download.maizegdb.org/Zm-B73-REFERENCE-NAM-5.0/Zm-B73-REFERENCE-NAM-5.0.fa.gz
 gunzip Zm-B73-REFERENCE-NAM-5.0.fa.gz
 
@@ -1740,9 +1755,6 @@ Total count of deduplicated leftover sequences: 73841161 (53.41% of total)
 Total count of deduplicated leftover sequences: 76000221 (53.57% of total)
 About 50% of the data removed.
 
-
-
-
 ## Methylation extractor
 
 ```{bash, eval=FALSE}
@@ -1818,10 +1830,7 @@ make_fasta(df_F5_RPM_F5_SC_20_24nt$sequence, "data/df_F5_RPM_F5_SC_20_24nt.fa")
 
 ```
 
-
-7606 20-24nt mapped sRNAs retrieved. 
-
-Map these sRNAs (to get coordinates) and convert the bam into bed
+7606 20-24nt mapped sRNAs retrieved. Map these sRNAs (to get coordinates) and convert bam into bed.
 
 ```{bash, eval=FALSE}
 
@@ -1848,6 +1857,248 @@ awk '{ sum += $4; n++ } END { if (n > 0) print sum / n; }' F5_SC_20_24nt.meth.be
 ```
 
 Out of 7606 sRNAs, I end up with 1874 that have DNA methylation data. The average methylation at sRNA mapping site is 25.5%.
+
+```{r}
+
+# Get sequence of intersect (1736 sRNAs)
+F5_SC_20_24nt_meth <- as.data.frame(read.table("data/F5_SC_20_24nt.meth.bed", 
+                       header = FALSE, sep="\t",stringsAsFactors=FALSE, quote=""))
+
+F5_SC_20_24nt_meth$size <- F5_SC_20_24nt_meth$V3 - F5_SC_20_24nt_meth$V2
+
+```
+
+
+
+
+
+
+
+## Methylation at TEs
+
+It seems that Bismark does not handle well that there are many fasta entries so use a concatenate of all TE sequences to do Bismark mapping.
+
+Python script `extract_concatenate_dna_sequences.py` to concatenate fasta sequences:
+
+```
+import sys
+
+def extract_concatenate_dna_sequences(file_path):
+    with open(file_path, "r") as file:
+        sequence = ""
+        for line in file:
+            line = line.strip()
+            if line[0] != ">":
+                sequence += line
+        return sequence
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python script.py <fasta_file>")
+        sys.exit(1)
+
+    fasta_file_path = sys.argv[1]
+    dna_sequence = extract_concatenate_dna_sequences(fasta_file_path)
+    print(dna_sequence)
+
+```
+
+```{bash, eval=FALSE}
+# Concatenate all TE sequences
+python extract_concatenate_dna_sequences.py maizeTE02052020.fa > concatenated_TEs.fa
+
+# Add a header
+sed -i '1 i\>maizeTE02052020' concatenated_TEs.fa
+
+# Generate samtools index concatenated_TEs.fa.fai
+samtools faidx concatenated_TEs.fa
+
+# Build bowtie index
+bowtie-build -f concatenated_TEs.fa maizeTE02052020
+
+bowtie -S -p 4 -S -l 24 -n 0 maizeTE02052020 -r F5_SC_20_24nt.txt | \
+samtools sort | samtools view -S -o F5_SC_20_24nt_mapping_concatenated_TEs.sam -
+
+# reads processed: 7606
+# reads with at least one alignment: 575 (7.56%)
+# reads that failed to align: 7031 (92.44%)
+
+# Convert sam to bed
+sam2bed < F5_SC_20_24nt_mapping_concatenated_TEs.sam > F5_SC_20_24nt_mapping_concatenated_TEs.bed
+
+# Generate bismark indexes for concatenated_TEs.fa
+bismark_genome_preparation --bowtie2 /path/to/concatenated_TEs_fasta
+
+# Run bismark
+index="/path/to/concatenated_TEs_fasta"
+bismark -p 12 -q --bowtie2 --non_directional -o output_bismark_TEs/ $index pooled_SC.fq
+
+ # Deduplicate
+ deduplicate_bismark --single --bam --output_dir output_bismark_TEs/ \
+ output_bismark_TEs/pooled_SC_bismark_bt2.bam 
+
+ # Create bedGraph files
+ bismark_methylation_extractor --buffer_size 20G -o output_bismark_TEs \
+ --single-end --gzip --comprehensive --CX --bedGraph \
+ --counts output_bismark_TEs/pooled_SC_bismark_bt2.deduplicated.bam
+
+coverage2cytosine -o pooled_SC_TEs --dir output_bismark_TEs \
+--CX --genome_folder $index \
+output_bismark_TEs/pooled_SC_bismark_bt2.deduplicated.bismark.cov.gz
+ 
+# Keep positions with at least 5 read coverage
+awk '{ if ($4+$5>4) print $0 }' pooled_SC_TEs.CX_report.txt > pooled_SC_TEs.CX_report.filtered.txt
+
+# Sort file
+sort -k1,1 -k2,2n pooled_SC_TEs.CX_report.filtered.txt > pooled_SC_TEs.CX_report.filtered.sorted.txt
+
+# Create a bedGraph file
+awk 'BEGIN { OFS="\t" } { print $1, $2-1, $2, $4/($4+$5)}' \
+pooled_SC_TEs.CX_report.filtered.sorted.txt > pooled_SC_TEs.CX_report.filtered.sorted.bedGraph
+
+wc -l pooled_SC_TEs.CX_report.filtered.sorted.bedGraph
+892663 pooled_SC_TEs.CX_report.filtered.sorted.bedGraph
+```
+
+```
+Final Cytosine Methylation Report
+=================================
+Total number of C's analysed:   379527
+
+Total methylated C's in CpG context:    110974
+Total methylated C's in CHG context:    55726
+Total methylated C's in CHH context:    11798
+
+Total C to T conversions in CpG context:        3009
+Total C to T conversions in CHG context:        19245
+Total C to T conversions in CHH context:        178775
+
+C methylated in CpG context:    97.4%
+C methylated in CHG context:    74.3%
+C methylated in CHH context:    6.2%
+```
+
+```{bash, eval=FALSE}
+# Cleanup
+awk 'BEGIN {OFS="\t"} {print $1, $2, $3}' F5_SC_20_24nt_mapping_concatenated_TEs.bed > F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.bed
+
+bedGraph="/media/zicola/lab2/BSseq_SC/output_bismark_TEs/pooled_SC_TEs.CX_report.filtered.sorted.bedGraph"
+
+# How many sRNAs have methylation data
+bedtools map -a F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.bed \
+-b pooled_SC_TEs.CX_report.filtered.sorted.bedGraph -c 4 -o mean | \
+awk '$4 !="."' | wc -l
+# 483
+
+bedtools map -a F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.bed \
+-b pooled_SC_TEs.CX_report.filtered.sorted.bedGraph -c 4 -o mean | \
+awk '{ sum += $4; n++ } END { if (n > 0) print sum / n; }'e
+# 0.325267
+
+# Keep only these 483 sRNAs
+bedtools map -a F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.bed \
+-b pooled_SC_TEs.CX_report.filtered.sorted.bedGraph -c 4 -o mean | awk '$4 !="."' | \
+cut -f1-3 > F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed
+```
+
+The methylation at TEs for the 575 20-24-nt sRNAs mapping at TEs is of 32.5% on average.
+
+## Permutation at TEs
+
+To assess whether the sRNAs found in both F5 and SC are involed in DNA methylation in SC, we use a permutation approach:
+
+![](images/principle_permutation.png)
+We assess the level of methylation at the mapping sites of the F5-SC sRNAs and compare it to the level of methylation at shuffled sequences following the size and number distribution of the F5-SC sRNAs and perform several times the shuffling to see if the methylation value observed for the sRNAs could be observed by chance compared to a random distribution.
+
+
+```{bash, eval=FALSE}
+
+bedGraph="pooled_SC_TEs.CX_report.filtered.sorted.bedGraph"
+genome="concatenated_TEs.fa.fai"
+
+# Concatenate 3x the sRNAs to have enough sRNAs with DNA methylation value for the permutation
+cat F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed \
+F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed \
+F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed \
+> F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.3x.bed
+
+# Test if I have at least 575 sRNAs with DNA methylation values
+for i in {1..10}; do
+  #echo "Running permutation $i ..."
+  bedtools shuffle -i F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.3x.bed \
+  -g $genome | bedtools sort -i - > permutation_concatenated_TEs/perm_${i}.bed
+  bedtools map -a permutation_concatenated_TEs/perm_${i}.bed \
+  -b $bedGraph -c 4 -o mean | awk '{ if($4 != ".") {print $0} }' | wc -l
+done
+672
+648
+676
+681
+673
+682
+680
+651
+688
+700
+
+# Yes
+
+# Do proper permutation 100 times
+for i in {1..100}; do
+  echo "Running permutation $i ..."
+  bedtools shuffle -i F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.3x.bed \
+  -g $genome | bedtools sort -i - > permutation_concatenated_TEs/perm_${i}.bed
+  bedtools map -a permutation_concatenated_TEs/perm_${i}.bed -b $bedGraph -c 4 -o mean | \
+    awk '{ if($4 != ".") {print $0} }' | head -n 483 | \
+    awk '{ sum += $4; n++ } END { if (n > 0) print sum / n; }' >> \
+      permutation_concatenated_TEs/average_meth_permutation.txt
+    rm permutation_concatenated_TEs/perm_${i}.bed 
+done
+
+# Get average permutation across all permutations
+awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }' \
+permutation_concatenated_TEs/average_meth_permutation.txt
+0.296864
+
+```
+
+
+```{r}
+permutation_DNA_methylation <- as.vector(unlist(read.delim("data/average_meth_permutation.txt",
+                                                           header = F, dec=",")))
+observed_value <- as.double("0.325267")
+
+df_DNA_meth_permutation <- as.data.frame(matrix(nrow=101, ncol=1))
+
+names(df_DNA_meth_permutation) <- "value"
+
+df_DNA_meth_permutation$value <- c(observed_value, unlist(permutation_DNA_methylation))
+df_DNA_meth_permutation$value <- as.double(df_DNA_meth_permutation$value)
+
+ggplot(df_DNA_meth_permutation, aes(x="",y=value*100)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_point(position=position_jitter()) + 
+  theme_bw() + 
+  ylab("% of DNA methylation") + 
+  xlab("") + 
+  ggtitle("Permutation DNA methylation TEs") +
+  geom_hline(yintercept=32.5267) + 
+  theme(axis.text.x = element_text(color="black"), 
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_y_continuous(labels = scales::comma_format()) +  
+  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5)) + 
+      scale_y_continuous(labels = scales::comma_format())
+
+```
+
+![](images/permutation_methylation_TEs.png)
+
+## Methylation at 45S rRNA
 
 
 
