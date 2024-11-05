@@ -1814,7 +1814,7 @@ pooled_SC.CX_report.filtered.sorted.txt > pooled_SC.CX_report.filtered.sorted.be
 ```
 
 
-## Methylation at F5-SC overlapping canonical (20-24nt) sRNAs
+## F5-SC overlapping canonical (20-24nt) sRNAs
 
 ```{r}
 
@@ -1826,15 +1826,17 @@ sRNA_F5_SC_bool <- nchar(df_F5_RPM_F5_SC$sequence)>19 & nchar(df_F5_RPM_F5_SC$se
 
 df_F5_RPM_F5_SC_20_24nt <- df_F5_RPM_F5_SC[sRNA_F5_SC_bool,]
 
-make_fasta(df_F5_RPM_F5_SC_20_24nt$sequence, "data/df_F5_RPM_F5_SC_20_24nt.fa")
+make_fasta(df_F5_RPM_F5_SC_20_24nt$sequence, "data/df_F5_SC_20_24nt.fa")
 
 ```
 
 7606 20-24nt mapped sRNAs retrieved. Map these sRNAs (to get coordinates) and convert bam into bed.
 
-```{bash, eval=FALSE}
+## Methylation genome-wide
 
-bowtie -p 4 -S -l 24 -n 0 -x $index --threads 8 -f data/df_F5_RPM_F5_SC_20_24nt.fa | \
+```{bash, eval=FALSE}
+# Map the 7606 sRNAs on the genome to retrieve 
+bowtie -p 4 -S -l 24 -n 0 -x $index --threads 8 -f data/df_F5_SC_20_24nt.fa | \
 samtools sort | samtools view -S -o F5_RPM_F5_SC_20_24nt.sam -
 
 # reads processed: 7606
@@ -1857,21 +1859,6 @@ awk '{ sum += $4; n++ } END { if (n > 0) print sum / n; }' F5_SC_20_24nt.meth.be
 ```
 
 Out of 7606 sRNAs, I end up with 1874 that have DNA methylation data. The average methylation at sRNA mapping site is 25.5%.
-
-```{r}
-
-# Get sequence of intersect (1736 sRNAs)
-F5_SC_20_24nt_meth <- as.data.frame(read.table("data/F5_SC_20_24nt.meth.bed", 
-                       header = FALSE, sep="\t",stringsAsFactors=FALSE, quote=""))
-
-F5_SC_20_24nt_meth$size <- F5_SC_20_24nt_meth$V3 - F5_SC_20_24nt_meth$V2
-
-```
-
-
-
-
-
 
 
 ## Methylation at TEs
@@ -1916,7 +1903,8 @@ samtools faidx concatenated_TEs.fa
 # Build bowtie index
 bowtie-build -f concatenated_TEs.fa maizeTE02052020
 
-bowtie -S -p 4 -S -l 24 -n 0 maizeTE02052020 -r F5_SC_20_24nt.txt | \
+# Map 20-24-nt sRNAs
+bowtie -S -p 4 -S -l 24 -n 0 maizeTE02052020 -f data/df_F5_SC_20_24nt.fa | \
 samtools sort | samtools view -S -o F5_SC_20_24nt_mapping_concatenated_TEs.sam -
 
 # reads processed: 7606
@@ -2008,19 +1996,19 @@ The methylation at TEs for the 575 20-24-nt sRNAs mapping at TEs is of 32.5% on 
 To assess whether the sRNAs found in both F5 and SC are involed in DNA methylation in SC, we use a permutation approach:
 
 ![](images/principle_permutation.png)
+
 We assess the level of methylation at the mapping sites of the F5-SC sRNAs and compare it to the level of methylation at shuffled sequences following the size and number distribution of the F5-SC sRNAs and perform several times the shuffling to see if the methylation value observed for the sRNAs could be observed by chance compared to a random distribution.
 
 
 ```{bash, eval=FALSE}
-
-bedGraph="pooled_SC_TEs.CX_report.filtered.sorted.bedGraph"
-genome="concatenated_TEs.fa.fai"
-
 # Concatenate 3x the sRNAs to have enough sRNAs with DNA methylation value for the permutation
 cat F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed \
 F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed \
 F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.bed \
 > F5_SC_20_24nt_mapping_concatenated_TEs.cleaned.with_meth.3x.bed
+
+bedGraph="pooled_SC_TEs.CX_report.filtered.sorted.bedGraph"
+genome="concatenated_TEs.fa.fai"
 
 # Test if I have at least 575 sRNAs with DNA methylation values
 for i in {1..10}; do
@@ -2100,5 +2088,182 @@ ggplot(df_DNA_meth_permutation, aes(x="",y=value*100)) +
 
 ## Methylation at 45S rRNA
 
+Use one 45S copy for the mapping (chr6:22379319-22394870 from B73 NAM5). Sequence in `data/45S.fa`.
 
+```{bash, eval=FALSE}
+
+# Create bismark index for 45S.fa
+bismark_genome_preparation --bowtie2 /path/to/45S/
+
+# Run bismark
+index="/media/zicola/lab2/bismark_index_45S"
+bismark -p 4 -q --bowtie2 --non_directional -o output_bismark_one_rRNA_copy/ $index pooled_SC.fq
+
+ # Deduplicate
+deduplicate_bismark --single --bam --output_dir \
+output_bismark_one_rRNA_copy/ output_bismark_one_rRNA_copy/pooled_SC_bismark_bt2.bam
+
+ # Create bedGraph files
+bismark_methylation_extractor --buffer_size 20G -o output_bismark_one_rRNA_copy \
+--single-end --gzip --comprehensive --CX --bedGraph \
+--counts output_bismark_one_rRNA_copy/pooled_SC_bismark_bt2.deduplicated.bam 
+ 
+ # Create report
+index="/media/zicola/lab2/bismark_index_45S"
+coverage2cytosine -o pooled_SC_one_rRNA_copy --dir output_bismark_one_rRNA_copy \
+--CX --genome_folder $index \
+output_bismark_one_rRNA_copy/pooled_SC_bismark_bt2.deduplicated.bismark.cov.gz
+ 
+ # Keep positions with at least 5 read coverage
+awk '{ if ($4+$5>4) print $0 }' output_bismark_one_rRNA_copy/pooled_SC_one_rRNA_copy.CX_report.txt > \
+output_bismark_one_rRNA_copy/pooled_SC_one_rRNA_copy.CX_report.filtered.txt
+
+# Sort file
+sort -k1,1 -k2,2n output_bismark_one_rRNA_copy/pooled_SC_one_rRNA_copy.CX_report.filtered.txt > \
+output_bismark_one_rRNA_copy/pooled_SC_one_rRNA_copy.CX_report.filtered.sorted.txt
+
+# Create a bedGraph file
+awk 'BEGIN { OFS="\t" } { print $1, $2-1, $2, $4/($4+$5)}' \ 
+output_bismark_one_rRNA_copy/pooled_SC_one_rRNA_copy.CX_report.filtered.sorted.txt > \
+output_bismark_one_rRNA_copy/pooled_SC_one_rRNA_copy.CX_report.filtered.sorted.bedGraph
+
+# Check methylation
+awk '{ sum += $4; n++ } END { if (n > 0) print sum / n; }' \
+output_bismark_one_rRNA_copy/pooled_SC_one_rRNA_copy.CX_report.filtered.sorted.bedGraph
+0.472805
+
+```
+
+The average methylation at the 45S copy is 47.2%
+
+
+```{bash, eval=FALSE}
+
+# Build indexes
+bowtie-build -f 45S.fa 45S
+
+# Map without mismatches
+bowtie -p 8 -S -l 24 -n 0 45S -f df_F5_SC_20_24nt.fa | \
+  samtools sort | samtools view -b -o F5_SC_20_24nt_n0.bam -
+
+# reads processed: 7606
+# reads with at least one alignment: 2601 (34.20%)
+# reads that failed to align: 5005 (65.80%)
+# Reported 2601 alignments
+
+```
+
+2601 F5-SC sRNAs are mapping this 45S copy.
+
+```{bash, eval=FALSE}
+
+# Get bed file for the mapped sRNA
+samtools view -F 4 -S F5_SC_20_24nt_n0.bam > F5_SC_20_24nt_n0.sam
+
+# Convert sam to bed
+sam2bed < F5_SC_20_24nt_n0.sam > F5_SC_20_24nt_n0.bed
+
+# Cleanup
+awk 'BEGIN {OFS="\t"} {print $1, $2, $3}' F5_SC_20_24nt_n0.bed > F5_SC_20_24nt_n0.cleaned.bed
+
+bedtools map -a F5_SC_20_24nt_n0.cleaned.bed \
+-b pooled_SC_one_rRNA_copy.CX_report.filtered.sorted.bedGraph \
+-c 4 -o mean | awk '{ sum += $4; n++ } END { if (n > 0) print sum / n; }'
+0.455898
+
+```
+
+I get an average of 45.6% methylation for the 2601 sRNAs mapping the 45s.
+
+## Permutation at 45S rRNA
+
+```{bash, eval=FALSE}
+
+# Generate chrom.sizes file (fai file from samtools faidx)
+samtools faidx 45S.fa
+
+cat 45S.fa.fai 
+45S	5724	5	5724	5725
+
+bedGraph="pooled_SC_one_rRNA_copy.CX_report.filtered.sorted.bedGraph"
+genome="45S.fa.fai"
+
+for i in {1..10}; do
+  echo "Running permutation $i ..."
+  bedtools shuffle -i F5_SC_20_24nt_n0.cleaned.bed -g $genome | \
+  bedtools sort -i - > permutation_45s/perm_${i}.bed
+  bedtools map -a permutation_45s/perm_${i}.bed -b $bedGraph -c 4 -o mean | \
+    awk '{ if($4 != ".") {print $0} }' | wc -l
+done
+
+# Each permutation yields 2601 sRNAs so I don't need to concatenate the input bed file
+
+for i in {1..100}; do
+  echo "Running permutation $i ..."
+  bedtools shuffle -i F5_SC_20_24nt_n0.cleaned.bed -g $genome | \
+  bedtools sort -i - > permutation_45s/perm_${i}.bed
+  bedtools map -a permutation_45s/perm_${i}.bed -b $bedGraph -c 4 -o mean | \
+    awk '{ if($4 != ".") {print $0} }' | \
+    awk '{ sum += $4; n++ } END { if (n > 0) print sum / n; }' >> \
+    permutation_45s/average_meth_permutation.txt
+    rm permutation_45s/perm_${i}.bed 
+done
+
+awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }' \
+permutation_45s/average_meth_permutation.txt
+0.445208
+
+```
+
+The average methylation of the permutations is 44.5%.
+
+```{r}
+
+permutation_DNA_methylation <- as.vector(unlist(
+  read.delim("data/permutation_45S/average_meth_permutation.txt",
+                                                           header = F, dec=",")))
+observed_value <- as.double("0.455898")
+
+df_DNA_meth_permutation <- as.data.frame(matrix(nrow=101, ncol=1))
+
+names(df_DNA_meth_permutation) <- "value"
+
+df_DNA_meth_permutation$value <- c(observed_value, unlist(permutation_DNA_methylation))
+df_DNA_meth_permutation$value <- as.double(df_DNA_meth_permutation$value)
+
+ggplot(df_DNA_meth_permutation, aes(x="",y=value*100)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_point(position=position_jitter()) + 
+  theme_bw() + 
+  ylab("% of DNA methylation") + 
+  xlab("") + 
+  ggtitle("Permutation DNA methylation 45S") +
+  geom_hline(yintercept=45.5898) + 
+  theme(axis.text.x = element_text(color="black"), 
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_y_continuous(labels = scales::comma_format()) +  
+  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5)) + 
+      scale_y_continuous(labels = scales::comma_format())
+
+
+```
+
+![](images/permutation_methylation_45S.png)
+
+## Notes
+
+I did not upload on GitHub all files mentioned in this script due to the size limit available. However, all these files can be generated when starting from the raw fastq files available on NCBI and the maize annotations files available on [maizeGDB](https://www.maizegdb.org/).
+
+## Authors
+
+* **Johan Zicola** - *Initial work* - [johanzi](https://github.com/johanzi)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
 
