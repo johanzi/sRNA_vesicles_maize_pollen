@@ -1,7 +1,7 @@
 Argonaute-containing Vesicles Shuttle Small RNAs in Zea mays pollen
 ================
 Johan Zicola
-2024-11-05 12:33:58
+2024-11-29 14:48:02
 
 - [Software dependencies](#software-dependencies)
 - [R libraries](#r-libraries)
@@ -29,6 +29,8 @@ Johan Zicola
   - [Pollen tDRs expression](#pollen-tdrs-expression)
   - [UNITAS analysis](#unitas-analysis)
   - [sRNA expression by category](#srna-expression-by-category)
+  - [Sequence diversity and
+    expression](#sequence-diversity-and-expression)
   - [Analysis TEs](#analysis-tes)
     - [Mapping](#mapping)
     - [Relative expression per sRNA
@@ -413,7 +415,7 @@ for i in *.collapsed.fa; do
   prefix=$(basename ${i%%.*})
   awk -v RS='\n>' -v ORS='\n>' -v OFS='' -F'\n' '{$1=$1 "\t"}1' $i | \
           awk 'BEGIN {FS = "-"}{print $2}' | awk '{print $2"\t"$1}' | \
-          sed '$ d' | sort -k1,1  > $output/${prefix}.txt
+          sed '$ d' | sort -k1,1  > output/${prefix}.txt
 done
 ```
 
@@ -446,7 +448,8 @@ bash merge_datasets.sh
 ## Filter read count
 
 ``` bash
-# Most sRNAs have a row sum of 1, indicating they are present in only one sample with one read count. 
+# Most sRNAs have a row sum of 1, indicating they are present in 
+# only one sample with one read count. 
 # These are not going to help with the analysis so I can discard them
 awk '{x=0;for(i=2;i<=NF;i++)x=x+$i} x>1 {print $0}' merged_dataset.csv > cts.txt
 
@@ -1091,6 +1094,56 @@ ggplot(df_F5_RPM_F5_SC_tRF_rRF_size, aes(x=size, y=RPM, fill=category)) +
 
 ![](images/RPM_F5_SC_per_category.png)
 
+## Sequence diversity and expression
+
+``` r
+# Group per RPM and nb of sequences
+df_F5_RPM_F5_SC_tRF_rRF_category <- df_F5_RPM_F5_SC_tRF_rRF %>% group_by(category) %>% 
+  summarize(RPM=sum(RPM), nb_sequence=n(), .groups='drop') %>% arrange(RPM)
+
+# Order categories
+df_F5_RPM_F5_SC_tRF_rRF_category$category <- 
+  factor(df_F5_RPM_F5_SC_tRF_rRF_category$category, levels = c("rRNA", "tRNA","others"))
+
+# Boxplot
+
+g1 <- ggplot(df_F5_RPM_F5_SC_tRF_rRF_category, 
+             aes(x=factor(0), y=nb_sequence, fill=category)) + 
+  geom_bar(stat="identity") + 
+  theme_bw() + 
+  ylab("Number of sequences") + 
+  xlab("") + 
+  ggtitle("F5-SC sRNAs sequence diversity (n=22,408)") + 
+  scale_fill_manual(values=c("#d8b365", "#998ec3","#5ab4ac")) + 
+  theme(plot.title = element_text(hjust = 0.5))  + 
+  theme(axis.text.x = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black")) + 
+  scale_y_continuous(labels = scales::comma_format()) + 
+  coord_flip() + 
+  theme(legend.position = "none")
+
+
+g2 <- ggplot(df_F5_RPM_F5_SC_tRF_rRF_category, 
+             aes(x=factor(0), y=RPM, fill=category)) + 
+  geom_bar(stat="identity") + 
+  theme_bw() + ylab("RPM") + 
+  xlab("") + 
+  ggtitle("F5-SC sRNAs expression in F5 (n=22,408)") + 
+  scale_fill_manual(values=c("#d8b365", "#998ec3","#5ab4ac")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(axis.text.x = element_text(color="black"), 
+        axis.text.y = element_text(color="black"),
+        axis.ticks = element_line(color = "black"))+ 
+  scale_y_continuous(labels = scales::comma_format())  + 
+  coord_flip() + 
+  theme(legend.position = "none")
+
+ggarrange(g1, g2, nrow=2, ncol=1)
+```
+
+![](images/RPM_sequence_diversity_F5_SC.png)
+
 ## Analysis TEs
 
 ### Mapping
@@ -1629,7 +1682,7 @@ Read processing as described in Smallwood 2014:
 > CXXC affinity purification plus deep sequencing (CAP-seq)
 > experiments22. Informative CGIs were defined if at least 10 CpGs per
 > CGI were sequenced. Hyper-methylated and hypo-methylated CGIs were
-> defined as ≥80% and ≤20% methylation respectively. Annotation for
+> defined as \>80% and \<20% methylation respectively. Annotation for
 > comparison of genomic contexts (Fig. 2d, Supplementary Fig. 12, and
 > Supplementary Table 2) were extracted from previously published
 > datasets15,23.
